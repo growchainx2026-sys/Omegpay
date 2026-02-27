@@ -611,22 +611,29 @@ class Helper
     public static function gerarPwa()
     {
         $setting = Setting::first();
-        $themeColor = $setting->software_color ?? '#0d6efd';
+        $softwareName = $setting?->software_name ?? config('app.name', 'Omegpay');
+        $themeColor = $setting?->software_color ?? '#0d6efd';
+        $faviconPath = $setting?->favicon_light ?? 'icon_azul.png';
+
         $data = [
-            'name' => $setting->software_name,
-            'short_name' => $setting->software_name,
+            'name' => $softwareName,
+            'short_name' => $softwareName,
             'start_url' => env('APP_URL').'/',
             'display' => 'standalone',
             'background_color' => '#ffffff',
             'theme_color' => $themeColor,
-            'icon_192' => url('/storage'.$setting->favicon_light),
-            'icon_512' => url('/storage'.$setting->favicon_light)
+            'icon_192' => url('/storage/'.$faviconPath),
+            'icon_512' => url('/storage/'.$faviconPath)
         ];
 
-        Pwa::first()->update($data);
+        $pwa = Pwa::first();
+        if ($pwa) {
+            $pwa->update($data);
+        }
+
         $manifest = [
-            'name' => $setting->software_name,
-            'short_name' => $setting->software_name,
+            'name' => $softwareName,
+            'short_name' => $softwareName,
             'start_url' => env('APP_URL').'/',
             'display' => 'standalone',
             'background_color' => '#ffffff',
@@ -634,12 +641,12 @@ class Helper
             'orientation' => 'portrait',
             'icons' => [
                 [
-                    "src" => url('/storage'.$setting->favicon_light),
+                    "src" => url('/storage/'.$faviconPath),
                     "sizes" => "192x192",
                     "type" => "image/png"
                 ],
                 [
-                    "src" => url('/storage'.$setting->favicon_light),
+                    "src" => url('/storage/'.$faviconPath),
                     "sizes" => "512x512",
                     "type" => "image/png"
                 ]
