@@ -1,0 +1,728 @@
+@php
+    use App\Helpers\Helper;
+    $setting = Helper::settings();
+    $loginBgUrl = \App\Helpers\Helper::loginBackgroundUrl($setting->login_background ?? null);
+@endphp
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="{{ $setting->software_description }}">
+    <meta name="author" content="@thigasdev">
+    <link rel="icon" href="{{ \App\Helpers\Helper::faviconUrl($setting->favicon_light ?? null) }}" />
+    <title>{{ $setting->software_name }} - Criar conta</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --gateway-primary: {{ $setting->software_color ?? '#2563eb' }};
+            --gateway-primary-hover: {{ $setting->software_color ?? '#1d4ed8' }};
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f172a;
+            color: #1e293b;
+            overflow-x: hidden;
+        }
+
+        .register-root {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .register-panel {
+            flex: 0 0 50%;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .register-panel-visual {
+            background: url('{{ $loginBgUrl }}') center / cover no-repeat;
+            position: relative;
+            overflow: hidden;
+            align-items: flex-end;
+            padding-bottom: 2rem;
+        }
+
+        .register-panel-visual::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 45%;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 100%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .register-panel-visual .visual-content {
+            z-index: 1;
+        }
+
+        .register-panel-form {
+            background: #ffffff;
+        }
+
+        .register-form-inner {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .register-brand {
+            margin-bottom: 1.5rem;
+        }
+
+        .register-brand img {
+            height: 40px;
+            width: auto;
+        }
+
+        .register-form-inner h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0 0 1rem 0;
+        }
+
+        .register-progress {
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
+
+        .register-progress-bar {
+            height: 100%;
+            background: var(--gateway-primary);
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+
+        .register-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .register-step-circle {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #64748b;
+            background: #f1f5f9;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .register-step-circle:hover {
+            color: #334155;
+            background: #e2e8f0;
+        }
+
+        .register-step-circle.active {
+            background: var(--gateway-primary);
+            color: #fff;
+        }
+
+        .form-group-reg {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group-reg label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #334155;
+            margin-bottom: 0.375rem;
+        }
+
+        .form-group-reg input,
+        .form-group-reg select {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 0.9375rem;
+            font-family: inherit;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group-reg input:focus,
+        .form-group-reg select:focus {
+            outline: none;
+            border-color: var(--gateway-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .form-group-reg input::placeholder {
+            color: #94a3b8;
+        }
+
+        .form-group-reg .text-danger {
+            font-size: 0.8125rem;
+            margin-top: 0.25rem;
+        }
+
+        .form-group-reg input.is-invalid {
+            border-color: #dc3545;
+        }
+
+        .register-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.25rem;
+        }
+
+        .btn-reg {
+            padding: 0.875rem 1.5rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            border: none;
+        }
+
+        .btn-reg-primary {
+            background: var(--gateway-primary);
+            color: #fff;
+        }
+
+        .btn-reg-primary:hover {
+            background: var(--gateway-primary-hover);
+        }
+
+        .btn-reg-secondary {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-reg-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .btn-reg:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .register-step { display: none; }
+        .register-step.active { display: block; animation: regFadeIn 0.35s ease; }
+        @keyframes regFadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .register-password-rules {
+            font-size: 0.8125rem;
+            margin-bottom: 1rem;
+        }
+
+        .register-password-rules .rule {
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+            transition: color 0.2s;
+        }
+
+        .register-password-rules .rule.valid {
+            color: #16a34a;
+        }
+
+        .register-password-rules .rule::before {
+            content: '○ ';
+            margin-right: 0.25rem;
+        }
+
+        .register-password-rules .rule.valid::before {
+            content: '✓ ';
+        }
+
+        .register-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .register-footer a {
+            color: var(--gateway-primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .register-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .d-none {
+            display: none !important;
+        }
+
+        .visual-content {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            color: rgba(255,255,255,0.95);
+            width: 100%;
+        }
+
+        .visual-content p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        @media (max-width: 900px) {
+            .register-root {
+                flex-direction: column;
+                min-height: 100vh;
+            }
+
+            .register-panel {
+                flex: none;
+                min-height: auto;
+                padding: 1.5rem 1.25rem;
+            }
+
+            .register-panel-visual {
+                display: none;
+            }
+
+            .register-panel-form {
+                flex: 1;
+                width: 100%;
+                min-height: 100vh;
+                padding: 2rem 1.25rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #ffffff;
+            }
+
+            .register-brand {
+                display: flex;
+                justify-content: center;
+            }
+
+            .register-form-inner {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .register-form-inner h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .register-panel {
+                padding: 1rem;
+            }
+
+            .register-step-circle {
+                padding: 0.4rem 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            .register-buttons {
+                flex-direction: column;
+            }
+
+            .btn-reg {
+                width: 100%;
+            }
+        }
+
+        .register-alert {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+        .register-alert-error {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .register-alert ul { padding-left: 1.25rem; }
+    </style>
+</head>
+
+<body>
+    <div class="register-root">
+        <div class="register-panel register-panel-visual">
+            <div class="visual-content">
+                <p>© {{ date('Y') }} {{ $setting->software_name }}. Todos os direitos reservados.</p>
+            </div>
+        </div>
+
+        <div class="register-panel register-panel-form">
+            <div class="register-form-inner">
+                <div class="register-brand">
+                    <img src="{{ \App\Helpers\Helper::logoUrl($setting->logo_light ?? null) }}?ver={{ uniqid() }}" alt="{{ $setting->software_name }}" />
+                </div>
+
+                <div class="register-progress">
+                    <div class="register-progress-bar" id="registerProgressBar" style="width: 0%;"></div>
+                </div>
+                <div class="register-steps">
+                    <div class="register-step-circle active" onclick="displayStep(1)">Tipo</div>
+                    <div class="register-step-circle" onclick="displayStep(2)">Pessoal</div>
+                    <div class="register-step-circle" onclick="displayStep(3)">Confirmar</div>
+                </div>
+
+                <form id="multi-step-form" action="{{ route('auth.register') }}" method="POST">
+                    @csrf
+                    @if (request()->has('ref'))
+                        <input type="hidden" name="client_indication" value="{{ request()->get('ref') }}">
+                    @endif
+
+                    @if (session('error'))
+                        <div class="register-alert register-alert-error" role="alert">
+                            {{ session('error') }}
+                        </div>
+                    @endif
+                    @if ($errors->any())
+                        <div class="register-alert register-alert-error" role="alert">
+                            <strong>Corrija os erros:</strong>
+                            <ul class="mb-0 mt-1">
+                                @foreach ($errors->all() as $err)
+                                    <li>{{ $err }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    <div class="register-step register-step-1 active">
+                        <h1>Criar conta</h1>
+                        <div class="form-group-reg">
+                            <label for="tipo">Tipo de conta</label>
+                            <select class="form-control" id="tipo" name="tipo" required>
+                                <option value="">Selecione</option>
+                                <option value="pessoa_fisica" {{ old('tipo') == 'pessoa_fisica' ? 'selected' : '' }}>Pessoa Física</option>
+                                <option value="pessoa_juridica" {{ old('tipo') == 'pessoa_juridica' ? 'selected' : '' }}>Pessoa Jurídica</option>
+                            </select>
+                        </div>
+                        <div class="register-buttons">
+                            <button type="button" class="btn-reg btn-reg-primary next-step">Avançar</button>
+                        </div>
+                    </div>
+
+                    <div class="register-step register-step-2">
+                        <h1>Dados pessoais</h1>
+                        <div class="step-content"></div>
+                        <div class="form-group-reg">
+                            <label for="email-register">Email</label>
+                            <input type="email" name="email" id="email-register" placeholder="Seu email" required value="{{ old('email') }}">
+                            <div id="email-error" class="text-danger" style="display: none;"></div>
+                            @error('email')<div class="text-danger">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="form-group-reg">
+                            <label for="phone-register">Celular</label>
+                            <input type="text" name="phone" id="phone-register" placeholder="(00) 00000-0000" required value="{{ old('phone') }}">
+                            <div id="phone-error" class="text-danger" style="display: none;"></div>
+                            @error('phone')<div class="text-danger">{{ $message }}</div>@enderror
+                            @error('telefone')<div class="text-danger">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="register-buttons">
+                            <button type="button" class="btn-reg btn-reg-secondary prev-step">Voltar</button>
+                            <button type="button" class="btn-reg btn-reg-primary next-step">Avançar</button>
+                        </div>
+                    </div>
+
+                    <div class="register-step register-step-3">
+                        <h1>Confirmar</h1>
+                        <div class="form-group-reg">
+                            <label>Faturamento mensal</label>
+                            <select name="media_faturamento" class="form-control">
+                                <option value="0">Qual seu faturamento mensal?</option>
+                                <option value="0">Sem faturamento</option>
+                                <option value="100000">Abaixo de 100 mil</option>
+                                <option value="500000">Entre 100 e 500 mil</option>
+                                <option value="1000000">Entre 500 mil e 1 milhão</option>
+                                <option value="10000000">Mais de 1 milhão</option>
+                            </select>
+                        </div>
+                        <div class="form-group-reg">
+                            <label for="password-reg">Senha</label>
+                            <input type="password" name="password" id="password-reg" placeholder="Senha" value="{{ old('password') }}">
+                            @error('password')<div class="text-danger">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="form-group-reg">
+                            <label for="password_confirm-reg">Confirmar senha</label>
+                            <input type="password" name="password_confirm" id="password_confirm-reg" placeholder="Confirmar senha" value="{{ old('password_confirm') }}">
+                            @error('password_confirm')<div class="text-danger">{{ $message }}</div>@enderror
+                        </div>
+                        <div id="password-validation-rules" class="register-password-rules">
+                            <p class="rule" id="pass-length">Pelo menos 8 caracteres</p>
+                            <p class="rule" id="pass-upper">Uma letra maiúscula</p>
+                            <p class="rule" id="pass-lower">Uma letra minúscula</p>
+                            <p class="rule" id="pass-special">Um caractere especial (!@#$...)</p>
+                            <p class="rule" id="pass-match">As senhas devem ser idênticas</p>
+                        </div>
+                        <div class="register-buttons">
+                            <button type="button" class="btn-reg btn-reg-secondary prev-step">Voltar</button>
+                            <button type="submit" id="submit-btn" class="btn-reg btn-reg-primary" disabled>Enviar</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="template-fisica" class="d-none">
+                    <div class="form-group-reg">
+                        <label>Nome completo</label>
+                        <input type="text" name="name" placeholder="Nome completo" required value="{{ old('name') }}">
+                    </div>
+                    <div class="form-group-reg">
+                        <label>CPF</label>
+                        <input type="text" name="cpf" id="cpf-register" placeholder="000.000.000-00" required value="{{ old('cpf') }}">
+                        <div id="cpf-error" class="text-danger" style="display: none;"></div>
+                        @error('cpf_cnpj')<div class="text-danger">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+
+                <div id="template-juridica" class="d-none">
+                    <div class="form-group-reg">
+                        <label>Razão Social</label>
+                        <input type="text" name="razao_social" placeholder="Razão Social" required value="{{ old('razao_social') }}">
+                    </div>
+                    <div class="form-group-reg">
+                        <label>CNPJ</label>
+                        <input type="text" name="cnpj" id="cnpj-register" placeholder="00.000.000/0000-00" required value="{{ old('cnpj') }}">
+                        <div id="cnpj-error" class="text-danger" style="display: none;"></div>
+                        @error('cpf_cnpj')<div class="text-danger">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+
+                <div class="register-footer">
+                    <a href="/login">Já possui cadastro? Fazer Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let tipoSelecionado = '';
+
+        function insertStep2Fields(tipo) {
+            var content = $('.step-content');
+            content.empty();
+            if (tipo === 'pessoa_fisica') {
+                content.html($('#template-fisica').html());
+            } else if (tipo === 'pessoa_juridica') {
+                content.html($('#template-juridica').html());
+            }
+        }
+
+        function displayStep(step) {
+            currentStep = step;
+            showStep(step);
+        }
+
+        function showStep(step) {
+            $('.register-step').removeClass('active');
+            $('.register-step-' + step).addClass('active');
+            $('.register-step-circle').removeClass('active');
+            $('.register-step-circle:nth-child(' + step + ')').addClass('active');
+            $('#registerProgressBar').css('width', ((step - 1) / 2) * 100 + '%');
+        }
+
+        function validateStep(step) {
+            var valid = true;
+            $('.register-step-' + step + ' input, .register-step-' + step + ' select').each(function() {
+                if ($(this).prop('required') && $(this).val().trim() === '') {
+                    $(this).addClass('is-invalid');
+                    valid = false;
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+            return valid;
+        }
+
+        $(document).ready(function() {
+            var hasErrors = {{ $errors->any() ? 'true' : 'false' }};
+            var savedTipo = '{{ old('tipo', '') }}';
+            if (hasErrors && savedTipo) {
+                tipoSelecionado = savedTipo;
+                insertStep2Fields(savedTipo);
+                showStep(2);
+            } else {
+                showStep(1);
+            }
+
+            $('#tipo').on('change', function() {
+                tipoSelecionado = $(this).val();
+            });
+
+            $('.next-step').on('click', function() {
+                if (!validateStep(currentStep)) return;
+                if (currentStep === 1) {
+                    tipoSelecionado = $('#tipo').val();
+                    if (!tipoSelecionado) {
+                        alert('Selecione o tipo de conta');
+                        return;
+                    }
+                    insertStep2Fields(tipoSelecionado);
+                }
+                if (currentStep < 3) {
+                    currentStep++;
+                    showStep(currentStep);
+                }
+            });
+
+            $('.prev-step').on('click', function() {
+                if (currentStep > 1) {
+                    currentStep--;
+                    showStep(currentStep);
+                }
+            });
+
+            $(document).on('input', 'input[name="name"]', function() {
+                $(this).val($(this).val().replace(/[^A-Za-zÀ-ÿ ]+/g, ''));
+            });
+            $(document).on('input', 'input[name="razao_social"]', function() {
+                $(this).val($(this).val().replace(/[^A-Za-zÀ-ÿ0-9 ]+/g, ''));
+            });
+            $(document).on('focus', 'input[name="cpf"]', function() {
+                $(this).mask('000.000.000-00', { reverse: true });
+            });
+            $(document).on('focus', 'input[name="cnpj"]', function() {
+                $(this).mask('00.000.000/0000-00', { reverse: true });
+            });
+            $('#phone-register').mask('(00) 00000-0000');
+
+            function validarCPF(cpf) {
+                cpf = cpf.replace(/\D/g, '');
+                if (cpf.length !== 11) return false;
+                if (/^(\d)\1{10}$/.test(cpf)) return false;
+                var soma = 0;
+                for (var i = 0; i < 9; i++) soma += parseInt(cpf.charAt(i)) * (10 - i);
+                var resto = 11 - (soma % 11);
+                if (resto === 10 || resto === 11) resto = 0;
+                if (resto !== parseInt(cpf.charAt(9))) return false;
+                soma = 0;
+                for (var i = 0; i < 10; i++) soma += parseInt(cpf.charAt(i)) * (11 - i);
+                resto = 11 - (soma % 11);
+                if (resto === 10 || resto === 11) resto = 0;
+                return resto === parseInt(cpf.charAt(10));
+            }
+
+            function validarCNPJ(cnpj) {
+                cnpj = cnpj.replace(/\D/g, '');
+                if (cnpj.length !== 14) return false;
+                if (/^(\d)\1{13}$/.test(cnpj)) return false;
+                var tamanho = cnpj.length - 2, numeros = cnpj.substring(0, tamanho), digitos = cnpj.substring(tamanho), soma = 0, pos = tamanho - 7;
+                for (var i = tamanho; i >= 1; i--) {
+                    soma += numeros.charAt(tamanho - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+                var resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+                if (resultado !== parseInt(digitos.charAt(0))) return false;
+                tamanho++; numeros = cnpj.substring(0, tamanho); soma = 0; pos = tamanho - 7;
+                for (var i = tamanho; i >= 1; i--) {
+                    soma += numeros.charAt(tamanho - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+                resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+                return resultado === parseInt(digitos.charAt(1));
+            }
+
+            function validarEmail(email) {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            }
+            function validarCelular(celular) {
+                celular = celular.replace(/\D/g, '');
+                return celular.length === 11 && /^[1-9]\d{10}$/.test(celular);
+            }
+            function mostrarErro(campoId, mensagem) {
+                $('#' + campoId).addClass('is-invalid');
+                $('#' + campoId + '-error').text(mensagem).show();
+            }
+            function limparErro(campoId) {
+                $('#' + campoId).removeClass('is-invalid');
+                $('#' + campoId + '-error').hide();
+            }
+
+            function verificarCamposValidos() {
+                if (tipoSelecionado === 'pessoa_fisica') {
+                    var cpf = $('input[name="cpf"]').val();
+                    if (!cpf || !validarCPF(cpf)) return false;
+                }
+                if (tipoSelecionado === 'pessoa_juridica') {
+                    var cnpj = $('input[name="cnpj"]').val();
+                    if (!cnpj || !validarCNPJ(cnpj)) return false;
+                }
+                if (!$('#email-register').val() || !validarEmail($('#email-register').val())) return false;
+                if (!$('#phone-register').val() || !validarCelular($('#phone-register').val())) return false;
+                return true;
+            }
+
+            $(document).on('input blur', 'input[name="cpf"]', function() {
+                var valor = $(this).val();
+                if (!valor) { limparErro('cpf-register'); return; }
+                if (validarCPF(valor)) limparErro('cpf-register'); else mostrarErro('cpf-register', 'CPF inválido');
+            });
+            $(document).on('input blur', 'input[name="cnpj"]', function() {
+                var valor = $(this).val();
+                if (!valor) { limparErro('cnpj-register'); return; }
+                if (validarCNPJ(valor)) limparErro('cnpj-register'); else mostrarErro('cnpj-register', 'CNPJ inválido');
+            });
+            $('#email-register').on('input blur', function() {
+                var valor = $(this).val();
+                if (!valor) { limparErro('email-register'); return; }
+                if (validarEmail(valor)) limparErro('email-register'); else mostrarErro('email-register', 'Email inválido');
+            });
+            $('#phone-register').on('input blur', function() {
+                var valor = $(this).val();
+                if (!valor) { limparErro('phone-register'); return; }
+                if (validarCelular(valor)) limparErro('phone-register'); else mostrarErro('phone-register', 'Celular inválido');
+            });
+
+            $('#multi-step-form').on('submit', function(e) {
+                if (!verificarCamposValidos()) {
+                    e.preventDefault();
+                    alert('Por favor, corrija os erros nos campos antes de enviar.');
+                    return false;
+                }
+            });
+
+            function checkPasswordValidation() {
+                var password = $('input[name="password"]').val();
+                var confirmPassword = $('input[name="password_confirm"]').val();
+                var allValid = true;
+                if (password.length >= 8) $('#pass-length').addClass('valid'); else { $('#pass-length').removeClass('valid'); allValid = false; }
+                if (/[A-Z]/.test(password)) $('#pass-upper').addClass('valid'); else { $('#pass-upper').removeClass('valid'); allValid = false; }
+                if (/[a-z]/.test(password)) $('#pass-lower').addClass('valid'); else { $('#pass-lower').removeClass('valid'); allValid = false; }
+                if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) $('#pass-special').addClass('valid'); else { $('#pass-special').removeClass('valid'); allValid = false; }
+                if (password && password === confirmPassword) $('#pass-match').addClass('valid'); else { $('#pass-match').removeClass('valid'); allValid = false; }
+                $('#submit-btn').prop('disabled', !allValid);
+            }
+            $(document).on('keyup', 'input[name="password"], input[name="password_confirm"]', function() {
+                checkPasswordValidation();
+            });
+        });
+    </script>
+</body>
+
+</html>

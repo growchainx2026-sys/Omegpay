@@ -1,0 +1,537 @@
+@php
+    use App\Models\Setting;
+    $setting = Setting::first();
+@endphp
+
+@extends('layouts.link')
+
+@section('title', 'Link de pagamento')
+
+@section('content')
+    <form method="post" action="{{ route('links.order') }}">
+        @csrf
+        <input name="link_id" value="{{ $link->id }}" hidden />
+        {{-- STEP 1 --}}
+        <div id="step-1" class="card thigasdevpayment-card p-4 mx-auto d-flex">
+            <div class="card-body text-center">
+                {{-- ... Conteúdo do Step 1 (inclusivo do h1 e input de valor) ... --}}
+
+                <div class="mb-4">
+                    <div class="d-inline-flex justify-content-center align-items-center p-2 mb-2">
+                        <img src="{{ asset('storage/' . $link->user->favicon_light) }}"
+                            alt="{{ $link->user->software_name }}" height="36">
+                    </div>
+                    <p class="text-muted small m-0">
+                        {{ str_replace('https://', '', env('APP_URL')) . '/payment/link/' . $link->codigo }}
+                    </p>
+                </div>
+
+                <h1 class="h5 mb-4">
+                    @if(floatval($link->valor) == 0)
+                        {{ 'Digite o valor da sua compra' }}
+                    @else
+                        {{ 'O valor da sua compra é de' }}
+                    @endif
+                </h1>
+
+                <div class="mb-5 d-flex align-items-center justify-content-center">
+                    <input type="text" class="form-control money-input text-center" placeholder="0,00" aria-label="Valor"
+                        name="valor" id="valor" value="{{ floatval($link->valor) == 0 ? '' : number_format(floatval($link->valor), 2, ',', '.') }}" {{ floatval($link->valor) == 0 ? '' : 'readonly' }} autofocus >
+                </div>
+                <p id="valor-error" class="text-center text-danger d-none"></p>
+
+                <div class="d-grid mb-5">
+                    <button id="step-1-btn" type="button" class="btn btn-primary btn-lg">Escolher meio de pagamento</button>
+                </div>
+
+                <p class="text-muted small d-flex align-items-center justify-content-center mb-0">
+                    <iconify-icon icon="mdi:security-lock" class="text-success" width="20" height="20"></iconify-icon>
+                    Pagamento seguro 
+                </p>
+                <p class="text-muted small d-flex align-items-center justify-content-center mt-n2">
+                    Processado por {{ $setting->software_name }}
+                </p>
+
+            </div>
+        </div>
+
+        {{-- STEP 2 --}}
+        <div id="step-2" class="card p-4 mx-auto d-none">
+            {{-- ... Conteúdo do Step 2 (meios de pagamento e formulários) ... --}}
+
+            <div class="row">
+                <div class="col-12" style="position: relative;">
+                    <h4 class="text-center mb-4">Escolha o meio de pagamento</h4>
+                    <button type="button"
+                        class="btn btn-voltar btn-sm btn-outline-dark gap-2 d-flex align-items-center justify-content-center"
+                        style="position: absolute;top: 0px;left: 15px;" onclick="voltar()">
+                        <iconify-icon icon="tabler:arrow-back-up" width="20" height="20"></iconify-icon>
+                        Voltar
+                    </button>
+                </div>
+                <div class="w-100 col-12 col-lg-4 mx-auto">
+                    <div class="w-100 card-body text-center">
+                        <div class="w-100 row g-3 justify-content-center">
+                            @php
+                                $lbls = ['pix' => 'PIX', 'billet' => 'Boleto', 'card' => 'Cartão'];
+                                $ic = ['pix' => 'ri:pix-fill', 'billet' => 'fontisto:shopping-barcode', 'card' => 'f7:creditcard-fill'];
+                            @endphp
+
+                            @foreach ($link->meios as $meio)
+                                <div class="col-4 col-md-3">
+                                    <div class="payment-card text-center border rounded-3 p-3 h-100"
+                                        style="cursor: pointer; transition: all 0.2s ease;"
+                                        onclick="selectMeio('{{ $meio }}', this)">
+                                        <iconify-icon icon="{{ $ic[$meio] }}" width="32" height="32"></iconify-icon>
+                                        <div class="fw-semibold">{{ $lbls[$meio] }}</div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <input type="hidden" id="input-meio" name="meio">
+                    </div>
+                </div>
+            </div>
+
+            {{-- PIX --}}
+            <div id="card-pix" class="col-12 p-4 mx-auto d-none" style="max-width: 640px">
+                <div class="row g-4">
+                    <hr class="my-0" />
+                    {{-- Dados pessoais --}}
+                    <div class="col-12">
+                        @include('pages.links.partials.payment-personal-address', ['prefix' => 'pix'])
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- CARTÃO --}}
+            <div id="card-card" class="col-12 p-4 mx-auto d-none" style="max-width: 640px">
+                <div class="row g-4">
+                    <hr class="my-0" />
+
+                    {{-- Dados pessoais + endereço --}}
+                    <div class="col-12">
+                        @include('pages.links.partials.payment-personal-address', ['prefix' => 'card'])
+                    </div>
+
+                    {{-- Dados do cartão --}}
+                    <div class="col-12 mt-4">
+                        <h5 class="fw-semibold mb-3">Dados do Cartão</h5>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Número do Cartão</label>
+                                <input type="text" class="form-control card-number-input" id="card_number"
+                                    name="card[number]" placeholder="0000 0000 0000 0000">
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label">Validade</label>
+                                <input type="text" class="form-control card-valid-input" id="card_valid" name="card[valid]"
+                                    placeholder="MM/AA">
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label">CVV</label>
+                                <input type="text" class="form-control card-cvv-input" id="card_cvv" name="card[cvv]"
+                                    placeholder="123">
+                            </div>
+
+                            <div id="container-parcels" class="col-12 col-md-4 d-none">
+                                <label class="form-label">Parcelas</label>
+                                <select class="form-control" id="installment" name="installment">
+
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {{-- BOLETO --}}
+            <div id="card-billet" class="col-12 p-4 mx-auto d-none" style="max-width: 640px">
+                <div class="row g-4">
+                    <hr class="my-0" />
+
+                    {{-- Dados pessoais + endereço --}}
+                    <div class="col-12">
+                        @include('pages.links.partials.payment-personal-address', ['prefix' => 'billet'])
+                    </div>
+                    <div class="col-12 text-end">
+                        <button id="btn-submit" type="button" class="btn btn-primary">
+                            Continuar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        {{-- STEP 3 - RETORNO DO PAGAMENTO --}}
+        <div id="step-3" class="card p-4 mx-auto d-none" style="max-width: 640px">
+            @if (session('meio'))
+                @php
+                    $meio = session('meio');
+                    $data = session('data') ?? [];
+                    $tran = $data['transaction'] ?? null;
+                    $status = $tran['status'] ?? ($data['status'] ?? 'pending'); // Pega o status, ou 'pending' se não tiver
+                @endphp
+
+                <div class="text-center mb-4">
+                    @if ($status === 'paid' || $meio === 'pix' || $meio === 'billet')
+                        <iconify-icon id="ic-pay" icon="mdi:check-circle" class="text-success" width="48" height="48"></iconify-icon>
+                        <h2 id="header-pay" class="h4 mt-3 fw-bold text-success">
+                            @if ($meio === 'card' && $status === 'paid')
+                                Pagamento Confirmado!
+                            @elseif ($meio === 'pix')
+                                PIX Gerado com Sucesso!
+                            @elseif ($meio === 'billet')
+                                Boleto Gerado com Sucesso!
+                            @else
+                                Pagamento Pendente
+                            @endif
+                        </h2>
+                    @elseif ($status === 'failed' || $status === 'refused')
+                        <iconify-icon icon="mdi:close-circle" class="text-danger" width="48" height="48"></iconify-icon>
+                        <h2 class="h4 mt-3 fw-bold text-danger">Pagamento Recusado</h2>
+                        <p class="text-muted small">Ocorreu um erro ao processar seu pagamento. Tente novamente ou use outro meio.</p>
+                    @else
+                        <!-- <iconify-icon icon="mdi:information" class="text-warning" width="48" height="48"></iconify-icon>
+                        <h2 class="h4 mt-3 fw-bold text-warning">Status do Pagamento: {{ ucfirst($status) }}</h2> -->
+                    @endif
+                </div>
+
+                @switch($meio)
+                    @case('pix')
+                        @if ($tran && isset($tran['qr_code_image_url']) && isset($tran['qrcode']))
+                            {{-- Conteúdo Padrão de Geração do PIX (Visível por Padrão) --}}
+                            <div id="cont-pay" class="row g-3">
+                                <div class="col-12 text-center">
+                                    <h5 class="fw-semibold">Escaneie o QR Code para pagar:</h5>
+                                    <img src="{{ $tran['qr_code_image_url'] }}" alt="QR Code PIX" width="200" height="200" class="img-fluid border p-2 rounded-3" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Código PIX (Copia e Cola)</label>
+                                    <div class="input-group">
+                                        <input id="pix-code" type="text" class="form-control" value="{{ $tran['qrcode'] }}" readonly />
+                                        <button class="btn btn-outline-primary" type="button" onclick="copiarTexto('pix-code')">
+                                            <iconify-icon icon="mdi:content-copy" width="20" height="20"></iconify-icon>
+                                            Copiar
+                                        </button>
+                                    </div>
+                                    <small class="text-success d-none" id="pix-copy-feedback">Copiado!</small>
+                                </div>
+                                <div class="col-12 text-center mt-4">
+                                    {{-- Exibe a expiração se disponível --}}
+                                    @if(isset($tran['expires_at']))
+                                        <p class="small text-muted">Este código expira em **{{ \Carbon\Carbon::parse($tran['expires_at'])->format('H:i') }}**.</p>
+                                    @else
+                                        <p class="small text-muted">Aguardando pagamento. Atualização automática em andamento...</p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Conteúdo de Sucesso do Pagamento (Oculto por Padrão) --}}
+                            <div id="cont-success" class="row g-3 text-center d-none">
+                                <div class="col-12">
+                                    <iconify-icon icon="mdi:check-circle" class="text-success" width="64" height="64"></iconify-icon>
+                                    <h3 class="mt-3 fw-bold text-success">Pagamento PIX Confirmado!</h3>
+                                    <p class="lead">Obrigado pela sua compra.</p>
+                                    <p class="lead">Seu pedido foi processado com sucesso.<</p>
+                                    
+                                </div>
+                            </div>
+
+                            {{-- JavaScript para Polling e Atualização --}}
+                            <script>
+                                // A função `copiarTexto` deve estar fora deste bloco e disponível globalmente.
+
+                                let pollingInterval; // Variável global para armazenar o ID do intervalo
+
+                                function startPixPolling() {
+                                    const url = "{{ route('consult.status.pix', ['id' => $tran['idTransaction']]) }}";
+                                    const contPay = document.getElementById('cont-pay');
+                                    const contSuccess = document.getElementById('cont-success');
+
+                                    // Executa a primeira verificação e inicia o intervalo
+                                    pollingInterval = setInterval(async () => {
+                                        try {
+                                            const response = await fetch(url);
+                                            const res = await response.json();
+
+                                            // Verifica se o status é 'paid' (ou o que seu endpoint retornar para sucesso)
+                                            if (res.status === true || res.status === 'paid') {
+                                                clearInterval(pollingInterval); // Para de consultar
+                                                
+                                                const icPay = document.getElementById('ic-pay');
+                                                const headerPay = document.getElementById('header-pay');
+                                                const btnOtherPay = document.getElementById('btn-other-pay');
+                                                if (icPay) icPay.classList.add('d-none');
+                                                if (headerPay) headerPay.classList.add('d-none');
+                                                if (btnOtherPay) btnOtherPay.classList.add('d-none');
+                                                // Oculta o QR Code e exibe o sucesso
+                                                if (contPay) contPay.classList.add('d-none');
+                                                if (contSuccess) contSuccess.classList.remove('d-none');
+                                                
+                                                // Opcional: Atualizar a URL na barra de endereços para evitar reenvio
+                                                if (window.history.replaceState) {
+                                                    window.history.replaceState(null, null, window.location.pathname);
+                                                }
+                                            }
+                                        } catch (error) {
+                                            console.error("Erro ao consultar status do PIX:", error);
+                                            // Continua o polling mesmo com erro de rede/API, a menos que seja um erro fatal.
+                                        }
+                                    }, 5000); // Consulta a cada 5 segundos (ajuste conforme a necessidade do seu backend)
+                                }
+
+                                // Inicia o polling quando a página estiver totalmente carregada
+                                document.addEventListener('DOMContentLoaded', startPixPolling);
+
+                                // Boa prática: Para o polling se o usuário navegar para fora da página
+                                window.addEventListener('beforeunload', () => {
+                                    clearInterval(pollingInterval);
+                                });
+                            </script>
+                        @else
+                            <p class="text-danger text-center">Não foi possível gerar o código PIX. Tente novamente.</p>
+                        @endif
+                        @break
+                    @case('billet')
+                        @if ($tran && isset($tran['barcode']))
+                            <div class="row g-3">
+                                <div class="col-12 text-center">
+                                    <h5 class="fw-semibold">Código de Barras do Boleto:</h5>
+                                    <img src="https://barcode.tec-it.com/barcode.ashx?data={{ $tran['barcode'] }}&code=Code128" alt="Código de Barras" class="img-fluid" style="max-width: 100%; height: auto;" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Linha Digitável (Copia e Cola)</label>
+                                    <div class="input-group">
+                                        <input id="billet-code" type="text" class="form-control" value="{{ $tran['barcode'] }}" readonly />
+                                        <button class="btn btn-outline-primary" type="button" onclick="copiarTexto('billet-code')">
+                                            <iconify-icon icon="mdi:content-copy" width="20" height="20"></iconify-icon>
+                                            Copiar
+                                        </button>
+                                    </div>
+                                    <small class="text-success d-none" id="billet-copy-feedback">Copiado!</small>
+                                </div>
+                                <div class="col-12 text-center mt-4">
+                                    @if(isset($tran['due_at']))
+                                        <p class="small text-muted">Vencimento: **{{ \Carbon\Carbon::parse($tran['due_at'])->format('d/m/Y') }}**.</p>
+                                    @endif
+                                    <a href="{{ $tran['download'] ?? '#' }}" target="_blank" class="btn btn-success mt-2">
+                                        <iconify-icon icon="mdi:download" width="20" height="20"></iconify-icon>
+                                        Baixar Boleto PDF
+                                    </a>
+                                </div>
+                            </div>
+                        @else
+                            <p class="text-danger text-center">Não foi possível gerar o Boleto. Tente novamente.</p>
+                        @endif
+                        @break
+
+                    @case('card')
+                        @if ($status === true)
+                            <div class="text-center">
+                                <iconify-icon icon="mdi:check-circle" class="text-success" width="64" height="64"></iconify-icon>
+                                <h3 class="mt-3 fw-bold text-success">Pagamento Confirmado!</h3>
+                                <p class="lead">Seu pagamento com cartão foi processado com sucesso!</p>
+                            </div>
+                        @else
+                            <p class="text-center lead">Não foi possível processar seu cartão. Motivo: {{ $tran['message'] ?? 'Erro desconhecido.' }}</p>
+                            <div class="text-center my-2">
+                                <button class="btn btn-primary" type="button" onclick="window.location.reload()">Escolher outro meio</button>
+                            </div>
+                        @endif                        
+                        @break
+                @endswitch
+            @endif
+        </div>
+    </form>
+
+    {{-- JS --}}
+    <script>
+        function voltar() {
+            let container1 = document.getElementById('step-1');
+            let container2 = document.getElementById('step-2');
+            container1.classList.remove('d-none');
+            container1.classList.add('d-flex');
+            container2.classList.remove('d-flex');
+            container2.classList.add('d-none');
+            // Oculta Step 3, se visível
+            document.getElementById('step-3').classList.add('d-none');
+           
+            btnSubmit.removeAttribute('type');
+            btnSubmit.setAttribute('type', 'button');
+        }
+
+        function copiarTexto(elementId) {
+            const input = document.getElementById(elementId);
+            const feedback = document.getElementById(`${elementId}-copy-feedback`);
+
+            // Seleciona o texto no input
+            input.select();
+            input.setSelectionRange(0, 99999); // Para dispositivos móveis
+
+            // Copia o texto
+            navigator.clipboard.writeText(input.value).then(() => {
+                // Exibe feedback
+                if (feedback) {
+                    feedback.classList.remove('d-none');
+                    setTimeout(() => feedback.classList.add('d-none'), 3000);
+                }
+            }).catch(err => {
+                console.error('Erro ao copiar o texto: ', err);
+                alert('Ocorreu um erro ao tentar copiar o texto. Tente selecionar manualmente.');
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const form = document.querySelector('form');
+
+            form.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                }
+            });
+
+            let container1 = document.getElementById('step-1');
+            let container2 = document.getElementById('step-2');
+            let container3 = document.getElementById('step-3'); // Novo!
+            let valor = document.querySelector('#valor');
+            let valorError = document.getElementById('valor-error');
+            let btnStep1 = document.getElementById('step-1-btn');
+
+            let btnSubmit = document.getElementById('btn-submit');
+
+            // Lógica de controle de passos ao carregar a página
+            @if (session('meio'))
+                // Se houver dados de pagamento na sessão, exibe o Step 3 e oculta os outros
+                container1.classList.add('d-none');
+                container2.classList.add('d-none');
+                container3.classList.remove('d-none');
+                container3.classList.add('d-flex');
+            @endif
+
+            btnStep1.addEventListener('click', function () {
+                if (valor.value) {
+                    btnSubmit.removeAttribute('type');
+                    btnSubmit.setAttribute('type', 'submit');
+
+                    calculaParcelas();
+                    container1.classList.remove('d-flex');
+                    container1.classList.add('d-none');
+                    container2.classList.remove('d-none');
+                    container2.classList.add('d-flex');
+                    valorError.classList.add('d-none'); // Esconde erro se progrediu
+                } else {
+                    valorError.textContent = 'Por favor, informe um valor válido.';
+                    valorError.classList.remove('d-none');
+                }
+            });
+
+            // Adiciona a lógica para ocultar Step 3 ao voltar do Step 2 (já na função voltar())
+        });
+        
+        // ... (Mantenha as funções `changeMeio`, `selectMeio` e `calculaParcelas` originais) ...
+        
+        function changeMeio(meio) {
+            let meioI = document.getElementById('input-meio');
+            meioI.value = meio;
+
+            ['card', 'billet', 'pix'].forEach((i) => {
+                let el = document.getElementById(`card-${i}`);
+                el.classList.add('d-none');
+                el.classList.remove('d-flex');
+            });
+
+            let cont = document.getElementById(`card-${meio}`);
+            cont.classList.remove('d-none');
+            cont.classList.add('d-flex');
+
+            // Máscara CPF e CEP
+            $('.cpf-input').inputmask('999.999.999-99', { placeholder: '_', clearIncomplete: true });
+            $('.cep-input').inputmask('99999-999', { placeholder: '_' });
+            $('.card-number-input').inputmask('9999 9999 9999 9999', { placeholder: ' ', clearIncomplete: true })
+            $('.card-cvv-input').inputmask('999', { placeholder: ' ', clearIncomplete: true }) // Ajustado para 3 dígitos
+            $('.card-valid-input').inputmask('99/99', { placeholder: '_', clearIncomplete: true }) // Ajustado para MM/AA
+            // Auto-preenchimento via CEP
+            $('.cep-input').on('blur', async function () {
+                const cep = this.value.replace(/\D/g, '');
+                if (cep.length === 8) {
+                    try {
+                        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+                        const data = await response.json();
+                        console.log(data)
+                        if (!data.erro) {
+                            $(`#${meio}_logradouro`).val(data.logradouro);
+                            $(`#${meio}_bairro`).val(data.bairro);
+                            $(`#${meio}_cidade`).val(data.localidade);
+                            $(`#${meio}_estado`).val(data.uf);
+                        }
+                    } catch (err) {
+                        console.error('Erro ao consultar o CEP:', err);
+                    }
+                }
+            });
+        }
+
+        function selectMeio(meio, el) {
+            document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('input-meio').value = meio;
+
+            if (meio === 'card') {
+                calculaParcelas();
+            }
+
+            // Se quiser mudar o card exibido automaticamente:
+            if (typeof changeMeio === 'function') {
+                changeMeio(meio);
+            }
+        }
+
+        // Inicializa os ícones Lucide
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        function calculaParcelas() {
+            let valor = $('#valor').val() || '0';
+            valor = valor.replace(/[^\d,]/g, '') // remove tudo que não é número ou vírgula
+                .replace(/\./g, '')
+                .replace(',', '.');
+            valor = parseFloat(valor) || 0;
+            console.log(valor)
+            fetch(`/api/pagarme/parcels/${valor}`)
+                .then(res => res.json())
+                .then(res => {
+                    let containerParcels = document.getElementById('container-parcels');
+                    let selectParcels = document.getElementById('installment');
+                    selectParcels.innerHTML = '';
+
+                    res.forEach((i, k) => {
+                        let option = document.createElement('option');
+                        option.value = i.value;
+                        option.innerText = i.label;
+                        if (i.value === 1) {
+                            option.setAttribute('selected', 'true');
+                        }
+
+                        selectParcels.appendChild(option);
+                        selectParcels.value = 1;
+                    })
+                    containerParcels.classList.remove('d-none');
+                })
+        }
+    </script>
+@endsection

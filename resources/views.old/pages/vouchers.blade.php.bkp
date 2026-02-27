@@ -1,0 +1,139 @@
+@extends('layouts.app')
+
+@section('title', 'vouchers de pagamento')
+
+@section('content')
+    <div class="header mb-3" style="display:flex;align-items:center;justify-content:space-between;">
+        <h1 class="header-title">
+            Vouchers
+            <br />
+            <small class="text-warning mt-n2">Em manutenção</small>
+        </h1>
+        {{-- Botão Adicionar que abre a modal --}}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLinkModal" disabled>
+            <i class="fa-solid fa-plus"></i>&nbsp;Adicionar
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table" style="width:100%;" id="table-vouchers-pagamento">
+                <thead>
+                    <tr>
+                        <th>Valor</th>
+                        <th>Código</th>
+                        <th>Descrição</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if(session('modal'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                let button = document.querySelector(`[data-bs-target="#{{ session('modal') }}"]`);
+                if (button) {
+                    button.click()
+                }
+            })
+        </script>
+    @endif
+
+    {{-- ================================================================= --}}
+    {{-- 1. MODAL ADICIONAR LINK DE PAGAMENTO --}}
+    {{-- ================================================================= --}}
+    <div class="modal fade" id="addLinkModal" tabindex="-1" aria-labelledby="addLinkModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addLinkModalLabel">Adicionar Novo Link de Pagamento</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ route('user.vouchers.store') }}" method="POST">
+                    @csrf
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="addValor" class="form-label">Valor (R$)</label>
+                            <input type="text" step="0.01" class="form-control money-input" id="addValor" name="valor"
+                                required>
+                            <small class="text-muted mt-1">Se definido como 0, receberá qualquer valor.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="addDescricao" class="form-label">Descrição</label>
+                            <textarea class="form-control" id="addDescricao" name="descricao" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label d-block">Meios de Pagamento</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="addMeioPix" name="meios[]" value="pix">
+                                <label class="form-check-label" for="addMeioPix">PIX</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="addMeioBoleto" name="meios[]"
+                                    value="billet">
+                                <label class="form-check-label" for="addMeioBoleto">Boleto</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="addMeioCartao" name="meios[]"
+                                    value="card">
+                                <label class="form-check-label" for="addMeioCartao">Cartão</label>
+                            </div>
+                        </div>
+                        {{-- Código e Status são gerados automaticamente na criação, mas mantive o campo para fins de
+                        demonstração --}}
+                        <input type="hidden" name="status" value="gerado">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Link</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    {{-- ================================================================= --}}
+    {{-- JAVASCRIPT PARA POPULAR MODAIS --}}
+    {{-- ================================================================= --}}
+
+    <script>
+        $(document).ready(function () {
+            $('.money-input').inputmask('decimal', {
+                radixPoint: ',', // separador decimal
+                groupSeparator: '.', // separador de milhar
+                digits: 2, // duas casas decimais
+                autoGroup: true,
+                rightAlign: true,
+                prefix: 'R$ ', // sem prefixo R$
+                removeMaskOnSubmit: true // remove máscara ao enviar o formulário
+            });
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            var table = $("#table-vouchers-pagamento").DataTable({
+                responsive: true,
+                ordering: false,
+                lengthChange: false,
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json',
+                    search: ''
+                }
+            });
+
+            table.on('draw', function () {
+                $('#table-vouchers-pagamento tbody tr').each(function () {
+                    $(this).find('td').css('border-bottom', 'none');
+                });
+            });
+
+            // Garante que o evento draw também seja executado na primeira renderização
+            table.draw();
+        });
+    </script>
+@endsection

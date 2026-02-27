@@ -1,0 +1,2911 @@
+@php
+    use App\Models\Setting;
+    $pwa = \App\Helpers\Helper::gerarPwa();
+
+    $setting = Setting::first();
+    $user = auth()->user();
+    $isUser = in_array($user->permission, ['user', 'affiliate']);
+    $isAdmin = in_array($user->permission, ['admin', 'dev']);
+    
+    // Para clientes (user/affiliate), usar cor personalizada se existir, senão usar a cor do setting
+    // Para admins, sempre usar a cor do setting
+    $color = ($isUser && $user->software_color) ? $user->software_color : $setting->software_color;
+    
+    // Função para converter HEX para RGBA
+    function hexToRgba($hex, $opacity = 0.5)
+    {
+        $hex = str_replace('#', '', $hex);
+
+        if (strlen($hex) == 3) {
+            $r = hexdec(str_repeat(substr($hex, 0, 1), 2));
+            $g = hexdec(str_repeat(substr($hex, 1, 1), 2));
+            $b = hexdec(str_repeat(substr($hex, 2, 1), 2));
+        } else {
+            $r = hexdec(substr($hex, 0, 2));
+            $g = hexdec(substr($hex, 2, 2));
+            $b = hexdec(substr($hex, 4, 2));
+        }
+
+        return "rgba($r, $g, $b, $opacity)";
+    }
+
+    $opacityColor = Str::contains($color, 'rgba')
+        ? preg_replace('/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/', 'rgba($1, $2, $3, 0.8)', $color)
+        : hexToRgba($color, 0.8);
+
+    $opacityColor2 = Str::contains($color, 'rgba')
+        ? preg_replace('/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/', 'rgba($1, $2, $3, 0.1)', $color)
+        : hexToRgba($color, 0.1);
+@endphp
+
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description" content="{{ $setting->software_description }}">
+    <meta name="author" content="@thigasdev">
+    <title>{{ $setting->software_name }} - @yield('title', 'Minha Aplicação')</title>
+    <link href="{{ asset('assets/css/modern.css') }}" rel="stylesheet">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
+    <link rel="icon" href="{{ \App\Helpers\Helper::faviconUrl($setting->favicon_light ?? null) }}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" />
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.9/jquery.inputmask.min.js"
+        integrity="sha512-F5Ul1uuyFlGnIT1dk2c4kB4DBdi5wnBJjVhL7gQlGh46Xn0VhvD8kgxLtjdZ5YN83gybk/aASUAlpdoWUjRR3g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-maskmoney/3.0.2/jquery.maskMoney.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
+    <script src="https://unpkg.com/dropzone@6.0.0-beta.1/dist/dropzone-min.js"></script>
+    <link href="https://unpkg.com/dropzone@6.0.0-beta.1/dist/dropzone.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/brands.min.css"
+        integrity="sha512-bSncow0ApIhONbz+pNI52n0trz5fMWbgteHsonaPk42JbunIeM9ee+zTYAUP1eLPky5wP0XZ7MSLAPxKkwnlzw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=dashboard" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css" />
+    <!-- JS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
+
+    <style>
+        :root {
+            --gateway-primary-color:
+                {{ $color ?? '#008f39' }}
+            ;
+            --gateway-background-color:
+                {{ $setting->software_color_background }}
+            ;
+            --gateway-sidebar-color:
+                {{ $setting->software_color_sidebar }}
+            ;
+            --gateway-text-color:
+                {{ $setting->software_color_text }}
+            ;
+            --gateway-primary-opacity:
+                {{$opacityColor}}
+            ;
+            --gateway-primary-opacity2:
+                {{$opacityColor2}}
+            ;
+            --gateway-logo:
+                {{ $setting->software_logo ?? '' }}
+            ;
+            --bs-btn-close-color:
+                {{ $setting->software_color_text }}
+            ;
+        }
+
+        html,
+        body {
+            font-family: 'Inter', 'Open Sans';
+            overflow-y: hidden;
+            /* ou overflow-y: hidden */
+            height: 100%;
+        }
+
+        .custom-tooltip {
+            --bs-tooltip-bg: var(--gateway-primary-color);
+            --bs-tooltip-color: var(--gateway-text-color);
+        }
+
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important
+        }
+
+        /* WebKit: Chrome, Edge, Safari, Opera */
+        ::-webkit-scrollbar {
+            width: 6px;
+            /* largura vertical */
+            height: 6px;
+            /* altura horizontal */
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--gateway-primary-color);
+            /* cor da barra */
+            border-radius: 10px;
+            border: 1px solid transparent;
+        }
+
+        /* Firefox */
+        * {
+            scrollbar-width: auto;
+            /* "auto" ou "thin" */
+            scrollbar-color: var(--gateway-primary-color) transparent;
+            /* cor da barra e do fundo */
+        }
+
+        table.dataTable tbody tr {
+            border-bottom: none !important;
+        }
+
+        table.dataTable {
+            border-collapse: collapse !important;
+        }
+
+        .sidebar-link span,
+        .sidebar-link i {
+            font-size: 18px !important;
+        }
+
+        .header {
+            background: transparent !important;
+        }
+
+        .wrapper {
+            background-color: var(--gateway-background-color) !important;
+        }
+
+        .wrapper:before {
+            background: transparent !important;
+        }
+
+        .card,
+        .navbar .sidebar-brand,
+        .sidebar-brand:hover {
+            background-color: var(--gateway-sidebar-color) !important;
+            color: var(--gateway-text-color) !important;
+        }
+
+        .sidebar-brand.text-center {
+            text-align: start !important;
+        }
+
+        .file-info,
+        .bg-primary-dark,
+        .badge.text-bg-dark {
+            background: var(--gateway-primary-color) !important;
+            color: white !important;
+        }
+
+        .btn-primary {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+            color: white !important;
+        }
+
+        .btn-primary:hover {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .fas,
+        .fa,
+        .fa-solid,
+        .text-primary,
+        .text-primary:after,
+        .card-title,
+        .sidebar-user small {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        button fa,
+        button .fas,
+        button .fa-solid {
+            color: white !important;
+        }
+
+        .nav-link fa,
+        .nav-link .fas,
+        .nav-link .fa-solid {
+            color: white !important;
+        }
+
+        .dropdown-item fa,
+        .dropdown-item .fas,
+        .dropdown-item .fa-solid,
+        .sidebar-user .text-primary {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .sidebar-user small {
+            margin-top: -10px !important;
+        }
+
+        body {
+            opacity: 0;
+        }
+
+        .badge-icon-info {
+            border-radius: 8px;
+            color: rgb(0, 80, 126);
+            padding: 2px;
+            font-size: 28px;
+        }
+
+        .badge-icon-success {
+            border-radius: 8px;
+            color: rgb(4, 126, 0);
+            padding: 2px;
+            font-size: 28px;
+        }
+
+        .badge-icon-danger {
+            border-radius: 8px;
+            color: rgb(126, 19, 0);
+            padding: 2px;
+            font-size: 28px;
+        }
+
+        .badge-icon-warning {
+            border-radius: 8px;
+            color: rgb(126, 124, 0);
+            padding: 2px;
+            font-size: 28px;
+        }
+
+        .item-trasanctions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            max-width: 100%;
+            height: 100%;
+        }
+
+        .item-trasanctions i {
+            position: absolute;
+            top: 33%;
+            left: 0;
+            margin-right: 10px;
+            font-size: 28px;
+        }
+
+        .item-trasanctions span {
+            width: 100px;
+            text-align: start;
+        }
+
+        .time {
+            padding: 4px 12px;
+            color: #f7f7f7;
+            font-size: 1.6em;
+            font-weight: 300;
+            border-radius: 4px;
+        }
+
+        .header-title,
+        .header-subtitle,
+        .nav-item .nav-link i {
+            color: gray !important;
+        }
+
+        .pendente {
+            text-align: start !important;
+            font-weight: 700 !important;
+            width: 100% !important;
+            color: rgb(255, 102, 0) !important;
+            border-radius: 20px !important;
+            border-color: transparent !important;
+        }
+
+        .liberar {
+            text-align: start !important;
+            font-weight: 700 !important;
+            width: 100% !important;
+            color: rgba(58, 58, 58, 1) !important;
+            border-radius: 20px !important;
+            border-color: transparent !important;
+        }
+
+        .btn-outline-success,
+        .pago {
+            text-align: start !important;
+            font-weight: 700 !important;
+            width: 100% !important;
+            color: rgb(0, 175, 67) !important;
+            border-radius: 20px !important;
+            border-color: transparent !important;
+        }
+
+        .cancelado {
+            text-align: start !important;
+            font-weight: 700 !important;
+            width: 100% !important;
+            color: rgb(255, 0, 0) !important;
+            border-radius: 20px !important;
+            border-color: transparent !important;
+        }
+
+        .padrao {
+            text-align: start !important;
+            font-weight: 500 !important;
+            width: 100% !important;
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+            color: rgb(0, 0, 0) !important;
+            border: 1px solid rgb(197, 197, 197) !important;
+            border-radius: 20px !important;
+        }
+
+        .swiper-pagination-bullet {
+            background-color: var(--gateway-primary-color) !important;
+        }
+
+        .button-more {
+            border-radius: 1px !important;
+            color: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+            padding-left: 12px !important;
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 20px !important;
+        }
+
+        [name="periodo"] {
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .button-more i {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .button-more:hover,
+        .button-more:active,
+        .button-more:focus {
+            background: transparent !important;
+        }
+
+        .main .navbar .menu-hamburguer,
+        .main .navbar .menu-hamburguer:after,
+        .main .navbar .menu-hamburguer:before {
+            display: none !important;
+        }
+
+        @media screen and (max-width: 991px) {
+
+            .main .navbar .menu-hamburguer,
+            .main .navbar .menu-hamburguer:after,
+            .main .navbar .menu-hamburguer:before {
+                display: block !important;
+            }
+
+        }
+
+        /* .sidebar {
+     	border-right: 1px dashed var(--gateway-primary-color) !important;
+     } */
+
+        .content {
+            margin-top: 20px !important;
+        }
+
+        .icone-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gateway-opacity) !important;
+            border-radius: 6px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            width: 40px !important;
+            height: 40px !important;
+        }
+
+        .icone-card i {
+            font-size: 20px !important;
+        }
+
+        #graficoDepositosSaques {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100%;
+            max-height: 250px;
+            box-sizing: border-box;
+        }
+
+        .velocimetro {
+            position: relative;
+            min-height: 221px
+        }
+
+        .grafico-depositos {
+            max-width: 98%;
+            position: relative;
+        }
+
+        @media screen and (max-width: 991px) {
+            .chart-sm {
+                height: 250px;
+                /* ou ajuste conforme seu layout */
+            }
+
+            #graficoDepositosSaques {
+                min-height: 250px !important;
+                max-height: 100% !important;
+            }
+
+            .velocimetro {
+                max-width: 98%;
+                position: relative;
+                min-height: 320px
+            }
+
+            .grafico-depositos {
+                max-width: 98%;
+                min-height: 300px;
+                position: relative;
+            }
+        }
+
+        @media screen and (max-width: 540px) {
+            .chart-sm {
+                height: 250px;
+                /* ou ajuste conforme seu layout */
+            }
+
+            #graficoDepositosSaques {
+                max-height: 100% !important;
+            }
+
+            .velocimetro {
+                position: relative;
+                min-height: 280px
+            }
+
+            .grafico-depositos {
+                max-width: 98%;
+                min-height: 300px;
+                position: relative;
+            }
+
+
+        }
+
+        .apexcharts-svg,
+        .apexcharts-radialbar-area {
+            width: 100% !important;
+        }
+
+        .sidebar {
+            max-width: 18rem !important;
+            min-width: 15rem !important;
+            width: 100% !important;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--gateway-sidebar-color) !important;
+        }
+
+        .sidebar-nav,
+        .sidebar:hover {
+            background-color: var(--gateway-sidebar-color) !important;
+        }
+
+        .sidebar-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding-bottom: 50px;
+            /* espaço extra para evitar sobreposição com footer */
+            background-color: var(--gateway-sidebar-color) !important;
+        }
+
+        .sidebar-footer {
+            background-color: var(--gateway-sidebar-color) !important;
+            position: sticky;
+            bottom: 40px;
+            z-index: 10;
+        }
+
+        .avatar-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+
+        .avatar-container:hover .edit-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .edit-overlay {
+            position: absolute;
+            bottom: 0;
+            height: 25%;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            clip-path: ellipse(100% 80% at 50% 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        main.content {
+            padding-left: 7rem !important;
+            padding-right: 7rem !important;
+        }
+
+        .page-content-fade main.content {
+            animation: pageFadeIn 0.35s ease forwards;
+        }
+        @keyframes pageFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media screen and (max-width: 1291px) {
+            main.content {
+                padding-left: 5rem !important;
+                padding-right: 5rem !important;
+            }
+        }
+
+        @media screen and (max-width: 1190px) {
+            main.content {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+        }
+
+        .text-wrap-ellipsis {
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            /* Número de linhas desejadas */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 14px;
+        }
+
+        .text-wrap-ellipsis2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            /* Número de linhas desejadas */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-close {
+            fill: var(--gateway-text-color) !important;
+        }
+
+        .btn-close,
+        select,
+        input::placeholder {
+            color: var(--gateway-text-color) !important;
+        }
+
+        input:-ms-input-placeholder {
+            /* Internet Explorer 10–11 */
+            color: var(--gateway-text-color) !important;
+        }
+
+        input::-ms-input-placeholder {
+            /* Microsoft Edge (antigo) */
+            color: var(--gateway-text-color) !important;
+        }
+
+        input::-webkit-input-placeholder {
+            /* Chrome/Safari/Opera */
+            color: var(--gateway-text-color) !important;
+        }
+
+        input::-moz-placeholder {
+            /* Firefox 19+ */
+            color: var(--gateway-text-color) !important;
+        }
+
+        input:-moz-placeholder {
+            /* Firefox 4–18 */
+            color: var(--gateway-text-color) !important;
+        }
+
+        .btn-secondary {
+            border-color: rgb(71, 71, 71) !important;
+            background: transparent !important;
+            color: white !important;
+        }
+
+        .btn-secondary:hover {
+            border-color: rgb(71, 71, 71) !important;
+            background: rgb(71, 71, 71) !important;
+            color: white !important;
+        }
+
+        .btn-outline-secondary {
+            border-color: rgb(71, 71, 71) !important;
+            background-color: transparent !important;
+            color: white !important;
+        }
+
+        .btn-outline-secondary:hover {
+            border-color: rgb(71, 71, 71) !important;
+            background: rgb(71, 71, 71) !important;
+            color: white !important;
+        }
+
+        .btn-close {
+            --bs-btn-close-color: var(--gateway-text-color) !important;
+            --bs-btn-close-bg: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='var(--gateway-text-color)' d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414'/%3E%3C/svg%3E") !important;
+        }
+
+
+        .btn {
+            border-radius: 6px !important;
+        }
+
+        .btn-group>.btn {
+            border-radius: 0 !important;
+        }
+
+        .btn-group>.btn:first-of-type {
+            border-top-left-radius: 6px !important;
+            border-bottom-left-radius: 6px !important;
+        }
+
+        .btn-group>.btn:last-of-type {
+            border-top-right-radius: 6px !important;
+            border-bottom-right-radius: 6px !important;
+        }
+
+        .header-title,
+        .header-subtitle,
+        .dropdown-toggle i {
+            color: gray !important;
+        }
+
+
+        .sidebar-brand,
+        .sidebar-brand:hover,
+        .dropdown-menu {
+            background: var(--gateway-sidebar-color) !important;
+            color: var var(--gateway-text-color) !important;
+        }
+
+        p,
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        span,
+        td,
+        th,
+        li,
+        button,
+        input,
+        select,
+        textarea,
+        label,
+        small,
+        .dropdown-menu,
+        .dropdown-item,
+        .text-muted,
+        .form-floating>label,
+        .form-control,
+        .form-control>label,
+        .text-gateway,
+        .menu-hamburger>i,
+        .menu-hamburger>i:after,
+        .menu-hamburger>i:before,
+        .badge {
+            color: var(--gateway-text-color) !important;
+        }
+
+        select:valid,
+        .form-select:valid,
+        .form-select:selected,
+        select:selected {
+            color: var var(--gateway-text-color) !important;
+        }
+
+
+        td,
+        th,
+        input.form-control,
+        select,
+        textarea,
+        label,
+        .form-floating>label,
+        .form-floating>label:after,
+        .form-control {
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+
+
+        .header>.header-title,
+        .sidebar-link,
+        .dropdown-item,
+        .dropdown-menu>.dropdown-item {
+            color: var(--gateway-text-color) !important;
+        }
+
+        .sidebar-link:hover,
+        .sidebar-item.active>.sidebar-link,
+        .select option {
+            background: var(--gateway-background-color) !important;
+            color: var(--gateway-text-color) !important;
+        }
+
+        .swal2-popup,
+        .sidebar-dropdown>.sidebar-item>.sidebar-link,
+        .modal-content,
+        [data-bs-dismiss="modal"] {
+            background-color: var(--gateway-sidebar-color) !important;
+            color: var(--gateway-text-color) !important;
+        }
+
+        .sidebar-dropdown>.sidebar-item>.sidebar-link:hover,
+        .dropdown-item:hover {
+            background-color: var(--gateway-background-color) !important;
+            color: var(--gateway-text-color) !important;
+        }
+
+
+        span#tokenText,
+        span#secretText {
+            color: white !important;
+        }
+
+        .btn-success {
+            color: white !important;
+        }
+
+        .paginate_button {
+            border-radius: 6px !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .paginate_button:hover {
+            background: var(--gateway-primary-color) !important;
+            color: white !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+            color: white !important;
+        }
+
+        .paginate_button.next.disabled:hover,
+        .paginate_button.previous.disabled:hover {
+            background: transparent !important;
+        }
+
+        .item-conversao {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gateway-opacity);
+            padding: 10px;
+            border-radius: 100px;
+        }
+
+        .item-conversao i {
+            color: var(--gateway-primary-color);
+        }
+
+        .progress {
+            height: 10px !important;
+            background: var(--gateway-opacity2) !important;
+        }
+
+        .progress-bar {
+            background: var(--gateway-primary-color) !important;
+        }
+
+        .icon-circle {
+            width: 40px !important;
+            height: 40px !important;
+            border-radius: 20% !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: #fff !important;
+        }
+
+        .text-success-light {
+            color: #45c15f !important;
+        }
+
+        .text-danger-light {
+            color: #e15757 !important;
+        }
+
+        .balance-card {
+            position: relative;
+            background-color: var(--gateway-primary-color) !important;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0) 0%, rgba(0, 0, 0, 0.2) 52%);
+            color: white;
+            border-radius: 1rem;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 100px;
+            overflow: hidden;
+        }
+
+        /* Imagem de fundo via ::after */
+        .balance-card::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 140px;
+            height: 140px;
+            background-image: url({{ json_encode(\App\Helpers\Helper::faviconUrl($setting->favicon_light ?? null)) }});
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: left bottom;
+            opacity: 0.05;
+            /* transparência */
+            filter: brightness(0) invert(1);
+            pointer-events: none;
+            /* permite clicar nos conteúdos acima */
+            z-index: 0;
+        }
+
+        /* Garante que o conteúdo fique acima da imagem */
+        .balance-card>* {
+            position: relative;
+            z-index: 1;
+        }
+
+        .balance-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .balance-change {
+            font-size: 0.9rem;
+            color: #52d56b;
+            /* verde claro */
+        }
+
+        .btn-green {
+            cursor: pointer !important;
+            background-color: #00cc66 !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .btn-green:hover {
+            cursor: pointer !important;
+            background-color: #00b358 !important;
+        }
+
+        .btn-dark-blue {
+            cursor: pointer !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            border: none !important;
+        }
+
+        .btn-dark-blue:hover {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .btn-outline-success i {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .btn-outline-success:hover i,
+        .btn-outline-success:hover {
+            background-color: var(--gateway-primary-color) !important;
+            color: white !important;
+        }
+
+        .btn-secondary {
+            border-color: rgb(59, 59, 59) !important;
+            color: rgb(59, 59, 59) !important;
+        }
+
+        .btn-secondary:hover {
+            border-color: rgb(59, 59, 59) !important;
+            background: rgb(59, 59, 59) !important;
+            color: white !important;
+        }
+
+        .btn-check:checked+.btn-outline-success {
+            background-color: var(--gateway-primary-color) !important;
+            color: white !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .card-metric {
+            border-radius: 1rem;
+            padding: 1.5rem;
+            height: 100%;
+        }
+
+        .card-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .card-change {
+            font-size: 0.875rem;
+        }
+
+        .card-icon {
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+
+        .card-success {
+            color: #28a745;
+        }
+
+        .card-danger {
+            color: #dc3545;
+        }
+
+        .recent-activity .amount {
+            font-weight: 600;
+        }
+
+        .card-visa {
+            background: linear-gradient(to right, #003366, #004080);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            color: white;
+            font-size: 1.2rem;
+            height: 80%;
+        }
+
+        .activity-icon {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            min-height: 36px;
+            max-width: 36px;
+            max-height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        .activity-add {
+            background-color: #dcfce7;
+            color: #22c55e;
+        }
+
+        .activity-send {
+            background-color: #e0f2fe;
+            color: #0ea5e9;
+        }
+
+        .status-success {
+            background-color: #dcfce7;
+            color: #15803d;
+            font-size: 0.875rem;
+            padding: 2px 8px;
+            border-radius: 0.375rem;
+        }
+
+        .status-pending {
+            background-color: #f1f5f9;
+            color: #64748b;
+            font-size: 0.875rem;
+            padding: 2px 8px;
+            border-radius: 0.375rem;
+        }
+
+        .table-borderless tbody tr {
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .btn-sm i {
+            margin-right: 4px;
+        }
+
+        .navbar {
+            max-height: 60px !important;
+            height: 60px !important;
+        }
+
+        .nav-logo-mobile {
+            display: none !important;
+        }
+        .nav-logo-mobile-dark {
+            display: none !important;
+        }
+
+        .navbar {
+            display: flex !important;
+        }
+
+        main.content {
+            margin-top: 0px !important;
+            padding-top: 10px !important;
+        }
+
+        .arrow-1 {
+            position: absolute;
+            top: 20px;
+            right: 10px;
+        }
+
+        .arrow-2 {
+            position: absolute;
+            top: 28px;
+            right: 10px;
+        }
+
+        @media screen and (max-width: 540px) {
+
+            .arrow-1,
+            .arrow-2 {
+                right: 25px;
+            }
+
+            .arrow-1 {
+                top: 38px
+            }
+
+            .arrow-2 {
+                top: 46px
+            }
+
+            .navbar {
+                display: flex !important;
+            }
+
+            .navbar {
+                max-height: 50px !important;
+                height: 50px !important;
+                margin: 0 !important;
+            }
+
+
+            .nav-logo-mobile {
+                display: block !important;
+            }
+            .nav-logo-mobile-dark {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .table-dash-transactions td {
+                white-space: nowrap;
+            }
+
+            .table-dash-transactions td .fw-bold {
+                font-size: 14px;
+            }
+
+            .table-dash-transactions td small {
+                font-size: 12px;
+            }
+
+        }
+
+        .dropup .dropdown-toggle::after {
+            display: none !important;
+        }
+
+        .nav-config-taxas {
+            --bs-nav-pills-link-active-bg: var(--gateway-primary-color) !important;
+            --bs-nav-pills-link-active-color: white !important;
+            --bs-nav-link-color: white !important;
+            --bs-nav-link-hover-color: white !important;
+        }
+
+        .nav-config-taxas .nav-item button {
+            border-radius: 1.2rem !important;
+        }
+
+        .nav-config-taxas .nav-item button.active {
+            color: white !important;
+        }
+
+        .nav-config-taxas .nav-item button:hover {
+            background: var(--gateway-opacity) !important;
+        }
+
+        .table-config-taxas,
+        .table-config-taxas th,
+        .table-config-taxas td {
+            border: none !important;
+        }
+
+        .sidebar-link {
+            display: flex !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+        }
+
+        .sidebar-link span {
+            text-align: start !important;
+        }
+
+        .sidebar-link i {
+            text-align: start !important;
+            height: auto !important;
+            width: 10px !important;
+        }
+
+
+
+        .icon-eye {
+            width: 20px !important;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            cursor: pointer;
+            opacity: 0.5;
+            color: rgba(39, 39, 39, 1) !important;
+        }
+
+        .icon-eye:hover {
+            opacity: 1;
+        }
+
+        .wrapper::before {
+            display: none !important;
+        }
+
+        .card-title,
+        .valor-visivel {
+            color: #111827 !important;
+        }
+
+        .text-muted {
+            color: #a5aab1 !important;
+        }
+
+        .header-title,
+        .sidebar-dropdown .sidebar-item a.sidebar-link,
+        .sidebar-link span {
+            color: #a5aab1 !important;
+        }
+
+        .sidebar-link svg {
+            stroke: rgb(156 163 175 / var(--tw-text-opacity, 1)) !important;
+        }
+
+        .sidebar-link .sidebar-item a.sidebar-link {
+            font-size: .875rem !important;
+            color: #111827 !important;
+        }
+
+        /*nav#sidebar {
+        border-right: 1px solid #9d9fa356 !important;
+    } */
+
+        .lucide.eye-toggle {
+            width: 20px !important;
+            stroke: #a5aab1 !important;
+        }
+
+        .table tbody,
+        .table td,
+        .table tfoot,
+        .table thead,
+        .table tr {
+            border-color: transparent !important;
+        }
+
+        .lucide {
+            stroke: #535d6a !important;
+        }
+
+        small.text-muted {
+            font-size: .875rem !important;
+            color: #78808a !important;
+        }
+
+        [name="periodo"] {
+            border-radius: 5px !important;
+            border-color: #a5aab1 !important;
+        }
+
+        [name="periodo"]:active {
+            border-color: #a5aab1 !important;
+            box-shadow: none !important;
+        }
+
+        .sidebar .sidebar-nav .sidebar-item .sidebar-link span {
+            color: #111827 !important;
+        }
+
+        .sidebar-item>.sidebar-link {
+            border-radius: 10px !important;
+        }
+
+        .sidebar-item.active>.sidebar-link,
+        .sidebar-item:hover>.sidebar-link {
+            background: var(--gateway-opacity2) !important;
+        }
+
+        .sidebar-item.active>.sidebar-link span.align-middle {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .sidebar-item.active>.sidebar-link svg {
+            stroke: var(--gateway-primary-color) !important;
+        }
+
+        .sidebar-item:hover>.sidebar-link svg {
+            stroke: var(--gateway-primary-color) !important;
+        }
+
+        .sidebar-item:hover>.sidebar-link span.align-middle {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: var(--gateway-sidebar-color) !important;
+            background-color: var(--gateway-sidebar-color) !important;
+            border-radius: 6px !important;
+            border: 1px solid #a5aab133 !important;
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .nav-tabs {
+            --bs-nav-tabs-border-width: 0 !important;
+            --bs-nav-tabs-link-active-bg: var(--gateway-primary-color) !important;
+            --bs-nav-tabs-link-active-color: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            margin-bottom: -10px !important;
+        }
+
+        .nav {
+            --bs-nav-link-color: var(--gateway-primary-color) !important;
+            --bs-nav-link-hover-color: var(--gateway-primary-color) !important;
+        }
+
+        .nav-tabs .nav-link {
+            border-radius: 10px !important;
+            padding: 10px 20px !important;
+        }
+
+        .fa-brands {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .badge.bg-primary {
+            background-color: var(--gateway-primary-color) !important;
+        }
+
+
+
+        a {
+            text-decoration: none !important;
+        }
+
+        .dropdown-item:hover {
+            background: var(--gateway-primary-opacity2) !important;
+        }
+
+        .table-responsive {
+            overflow-x: hidden !important;
+        }
+
+        .navbar {
+            z-index: 2 !important;
+            background: var(--gateway-sidebar-color) !important;
+            /* box-shadow: 4px 1px 10px rgba(0, 0, 0, 0.1) !important; */
+        }
+
+        .aumentar {
+            transition: all ease 0.5s !important;
+        }
+
+        .aumentar:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 0 5px var(--gateway-primary-opacity) !important;
+        }
+
+        .girar {
+            transition: all ease 0.5s !important;
+            cursor: pointer !important;
+        }
+
+        .aumentar:hover .girar,
+        .girar:hover {
+            border-top-right-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+        }
+
+        .text-bold {
+            font-weight: 900 !important;
+        }
+
+
+
+        .card.card-dash {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 100% !important;
+            max-height: 100% !important;
+        }
+
+        .card-dash p {
+            font-weight: 600 !important;
+        }
+
+        .tbold {
+            font-weight: 600 !important;
+        }
+
+        .t900 {
+            font-weight: 900 !important;
+        }
+
+        .btn-outline-primary {
+            height: 35px !important;
+            border: 1px solid var(--gateway-primary-color) !important;
+            color: var(--gateway-primary-color) !important;
+            background-color: transparent !important;
+            font-size: 16px !important;
+            border-radius: 6px !important;
+        }
+
+        .btn-outline-primary:hover {
+            background: var(--gateway-primary-color) !important;
+            color: white !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .text-gateway {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .bg-gateway {
+            background: var(--gateway-primary-color) !important;
+        }
+
+        @media screen and (max-width: 768px) {
+            .nv-topbar {
+                display: none !important;
+            }
+
+            .nav-alert {
+                max-width: 400px;
+                position: relative;
+            }
+        }
+
+        .bg-success,
+        .button-more:hover i {
+            color: white !important;
+        }
+
+        .nav-alert {
+            max-width: 400px;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            text-align: center !important;
+        }
+
+        .btn-produto {
+            transition: transform 0.2s all;
+        }
+
+        .btn-produto:hover {
+            border-radius: 0 !important;
+        }
+
+        .btn-outline-dark:hover {
+            color: white !important;
+        }
+
+        table.dataTable.hover tbody tr:hover {
+            background-color: var(--gateway-opacity) !important;
+        }
+
+
+        .payment-card i,
+        .payment-card img {
+            font-size: 1.8rem;
+            color: #3fff91;
+            position: absolute;
+            top: 1.2rem;
+            right: 1.2rem;
+        }
+
+        .payment-card h5 {
+            color: #3fff91;
+            font-weight: 700;
+        }
+
+        .payment-card small {
+            color: #a0a0a0;
+        }
+
+        .payment-rate {
+            color: #3fff91;
+            font-weight: 600;
+        }
+
+        .payment-select {
+            background-color: #24222b;
+            border: none;
+            color: #bbb;
+        }
+
+        .payment-select:focus {
+            box-shadow: none;
+            color: #fff;
+        }
+
+        .text-default {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .card-plano-recebimento {
+            border: 1px solid gray !important;
+            border-radius: 8px;
+            padding: 8px;
+            transition: all ease 0.3s;
+        }
+
+        .card-plano-recebimento.selecionado {
+            border: 2px solid var(--gateway-primary-color) !important;
+        }
+
+        .card-plano-recebimento:hover {
+            border: 1px solid var(--gateway-primary-color) !important;
+            box-shadow: 0px 0px 10px 10px var(--gateway-opacity);
+        }
+
+        .alert-primary {
+            display: flex;
+            align-items: center;
+            background-color: var(--gateway-primary-color) !important;
+        }
+
+        .alert-primary #btn-nft-enable {
+            border: none !important;
+            text-decoration: underline;
+
+        }
+
+        .border-left-card {
+            border-radius: 1.2rem !important;
+            border-left: 5px solid var(--gateway-primary-color) !important;
+        }
+
+        .card-dash {
+            border-radius: 1.2rem !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+            border: 1px solid rgba(0, 0, 0, 0.21) !important;
+        }
+
+        body.dark-mode .card-dash {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        .card {
+            border-radius: 1.2rem !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            border: 2px solid rgba(255, 255, 255, 0.55) !important;
+        }
+
+
+        .card-img-top {
+            border-top-left-radius: 1.2rem !important;
+            border-top-right-radius: 1.2rem !important;
+        }
+
+        .btn-danger {
+            color: white !important;
+        }
+
+        .chart-item-taxas {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-taxas {
+            width: 90px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-item-taxas small {
+            margin-top: 4px;
+            font-size: 0.85rem;
+            color: #333;
+        }
+
+        .charts-row-taxas {
+            min-height: 140px;
+            /* garante alinhamento vertical fixo */
+        }
+
+        /* COR PRINCIPAL: A data de INÍCIO e FIM SELECIONADA */
+        .daterangepicker td.active,
+        .daterangepicker td.active:hover {
+            background-color: var(--gateway-primary-color) !important;
+            /* Cor sólida para a data ativa */
+            color: #fff !important;
+            /* Cor do texto (branco) */
+            border-radius: 50%;
+            /* Mantém o formato circular das datas */
+        }
+
+        /* COR DO INTERVALO: Dias ENTRE a data de início e fim */
+        .daterangepicker td.in-range {
+            /* Usa uma cor mais clara ou a cor primária com opacidade */
+            background-color: var(--gateway-primary-color) !important;
+            color: #000;
+            /* Cor do texto dos dias dentro do intervalo */
+        }
+
+        /* HOVER: Cor ao passar o mouse sobre os dias (especialmente em 'in-range' e 'available') */
+        .daterangepicker td.available:hover,
+        .daterangepicker td.in-range:hover {
+            background-color: var(--gateway-primary-color) !important;
+            /* Cor de hover genérica, ajuste se necessário */
+            color: #ffff;
+        }
+
+        /* HOVER: Cor ao passar o mouse *DEPOIS* de selecionar a data inicial, para mostrar o intervalo que será selecionado */
+        .daterangepicker td.in-range.available:hover {
+            background-color: #e0eaf1 !important;
+            /* Exemplo de cor de hover mais clara */
+            color: #000;
+        }
+
+        /* Customizar o background dos botões Apply e Cancel se necessário */
+        .daterangepicker .drp-buttons .btn-primary {
+            background-color: var(--gateway-primary-color) !important;
+        }
+
+        /* ===== DARK MODE STYLES ===== */
+        /* Transições suaves para elementos principais */
+        body,
+        .wrapper,
+        .card,
+        .navbar-theme,
+        .sidebar,
+        .sidebar-link,
+        .table,
+        .dropdown-menu,
+        .form-control,
+        .form-select,
+        .modal-content,
+        .alert,
+        .badge,
+        .nav-link {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+        }
+
+        /* Botão de dark mode */
+        .dark-mode-toggle-btn {
+            border-radius: 50% !important;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease !important;
+        }
+
+        .dark-mode-toggle-btn:hover {
+            background-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .dark-mode-toggle-btn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.1) !important;
+        }
+
+        /* Ajustes de layout da navbar */
+        .navbar-theme {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 0.5rem 1rem !important;
+        }
+
+        .navbar-nav {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+        }
+
+        .navbar-nav .nav-item {
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* Navbar: ações (ícones + avatar) - alinhamento e círculos perfeitos */
+        .nav-actions-list {
+            gap: 6px !important;
+            align-items: center !important;
+        }
+        .nav-actions-list > .nav-item {
+            flex-shrink: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .navbar-theme .nav-profile-link.nav-link {
+            padding: 0 !important;
+        }
+        .nav-profile-link {
+            text-decoration: none !important;
+            transition: opacity 0.2s ease;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .nav-profile-link:hover {
+            opacity: 0.9;
+        }
+        .nav-profile-avatar {
+            border-radius: 50% !important;
+            display: block !important;
+            width: 40px !important;
+            height: 40px !important;
+            object-fit: cover !important;
+        }
+        /* Botões de ícone: tamanho fixo para círculo perfeito (não achatado) */
+        .navbar-theme .nav-icon-btn {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border-radius: 50% !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            color: #475569 !important;
+            transition: color 0.2s ease, background-color 0.2s ease;
+            box-sizing: border-box !important;
+        }
+        .navbar-theme .nav-icon-btn:hover {
+            color: var(--gateway-primary-color) !important;
+            background-color: rgba(0, 0, 0, 0.06) !important;
+        }
+        .navbar-theme .nav-icon-btn .nav-action-icon,
+        .navbar-theme .nav-icon-btn svg {
+            stroke: currentColor !important;
+            flex-shrink: 0 !important;
+        }
+        body.dark-mode .navbar-theme .nav-icon-btn {
+            color: #94a3b8 !important;
+        }
+        body.dark-mode .navbar-theme .nav-icon-btn:hover {
+            color: #e2e8f0 !important;
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        body.dark-mode .navbar-theme .nav-icon-btn .nav-action-icon,
+        body.dark-mode .navbar-theme .nav-icon-btn svg {
+            stroke: currentColor !important;
+        }
+        .navbar-theme .dark-mode-toggle-btn {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            color: #475569 !important;
+        }
+        .navbar-theme .dark-mode-toggle-btn:hover {
+            background-color: rgba(0, 0, 0, 0.06) !important;
+        }
+        body.dark-mode .navbar-theme .dark-mode-toggle-btn:hover {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        .navbar-theme .nav-icon-btn-wrapper {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex-shrink: 0 !important;
+            color: #475569 !important;
+            transition: color 0.2s ease, background-color 0.2s ease;
+            cursor: pointer;
+            box-sizing: border-box !important;
+        }
+        .navbar-theme .nav-icon-btn-wrapper:hover {
+            color: var(--gateway-primary-color) !important;
+            background-color: rgba(0, 0, 0, 0.06) !important;
+        }
+        .navbar-theme .nav-icon-btn-wrapper .nav-action-icon,
+        .navbar-theme .nav-icon-btn-wrapper svg {
+            stroke: currentColor !important;
+        }
+        body.dark-mode .navbar-theme .nav-icon-btn-wrapper {
+            color: #94a3b8 !important;
+        }
+        body.dark-mode .navbar-theme .nav-icon-btn-wrapper:hover {
+            color: #e2e8f0 !important;
+            background-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        .nav-alert {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .nav-logout-form {
+            display: flex !important;
+            align-items: center !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Ajuste para nivel-bar não sobrepor */
+        .nv-topbar {
+            z-index: 1 !important;
+        }
+
+        /* Logo sidebar e navbar: alternar entre light/dark */
+        .sidebar-logo-dark {
+            display: none !important;
+        }
+        body.dark-mode .sidebar-logo-light {
+            display: none !important;
+        }
+        body.dark-mode .sidebar-logo-dark {
+            display: inline-block !important;
+        }
+        /* No dark mode a logo não aparece na navbar */
+        body.dark-mode .nav-logo-mobile-light,
+        body.dark-mode .nav-logo-mobile-dark {
+            display: none !important;
+        }
+
+        /* Estilos para dark mode - mais escuro */
+        body.dark-mode {
+            background-color: #020617 !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .wrapper {
+            background-color: #020617 !important;
+        }
+
+        body.dark-mode main.content,
+        body.dark-mode .container-fluid {
+            background-color: #020617 !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .card,
+        body.dark-mode .navbar-theme,
+        body.dark-mode .sidebar-brand {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .navbar-theme {
+            background-color: #0f172a !important;
+            border-bottom: 1px solid #1e293b !important;
+        }
+
+        body.dark-mode .navbar-theme i,
+        body.dark-mode .navbar-theme .fa-moon,
+        body.dark-mode .navbar-theme .fa-sun {
+            color: #e2e8f0 !important;
+        }
+
+        /* Exceção para o ícone de dark mode - deve ser amarelo no dark mode */
+        body.dark-mode .navbar-theme .dark-mode-icon,
+        body.dark-mode .navbar-theme .dark-mode-icon.fa-moon,
+        body.dark-mode .navbar-theme .dark-mode-icon.fa-sun {
+            color: #fbbf24 !important;
+        }
+
+        body.dark-mode .sidebar {
+            background-color: #0f172a !important;
+        }
+
+        body.dark-mode .sidebar-user {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .sidebar-nav {
+            background-color: #0f172a !important;
+        }
+
+        body.dark-mode .sidebar-content {
+            background-color: #0f172a !important;
+        }
+
+        body.dark-mode .sidebar-link {
+            color: #cbd5e1 !important;
+        }
+
+        body.dark-mode .sidebar-link:hover {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .sidebar-link.active {
+            background-color: var(--gateway-primary-color) !important;
+            color: #ffffff !important;
+        }
+
+        /* Sidebar footer dark mode */
+        body.dark-mode .sidebar-footer {
+            background-color: #0f172a !important;
+        }
+
+        body.dark-mode .sidebar-footer-text,
+        body.dark-mode .sidebar-footer small {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .sidebar-footer a {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .sidebar-footer a:hover {
+            color: #e2e8f0 !important;
+        }
+
+        /* Sidebar menu labels/texts dark mode - alta especificidade */
+        body.dark-mode .sidebar .sidebar-nav .sidebar-item .sidebar-link span,
+        body.dark-mode .sidebar-link span.align-middle,
+        body.dark-mode .sidebar-link span,
+        body.dark-mode .header-title,
+        body.dark-mode .sidebar-dropdown .sidebar-item a.sidebar-link {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .sidebar-dropdown .sidebar-link {
+            background-color: #0f172a !important;
+        }
+
+        body.dark-mode .sidebar-dropdown .sidebar-item .sidebar-link:hover,
+        body.dark-mode .sidebar-dropdown .sidebar-item.active .sidebar-link {
+            background-color: #1e293b !important;
+        }
+
+        body.dark-mode .sidebar-item.active > .sidebar-link span.align-middle,
+        body.dark-mode .sidebar-item.active .sidebar-link span {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        body.dark-mode .sidebar-item:hover > .sidebar-link span.align-middle,
+        body.dark-mode .sidebar-item:hover .sidebar-link span {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        body.dark-mode .sidebar-link i,
+        body.dark-mode .sidebar-link .fas,
+        body.dark-mode .sidebar-link .fa,
+        body.dark-mode .sidebar-link .fa-solid {
+            color: #cbd5e1 !important;
+        }
+
+        body.dark-mode .sidebar-item.active > .sidebar-link i,
+        body.dark-mode .sidebar-item.active .sidebar-link .fas,
+        body.dark-mode .sidebar-item.active .sidebar-link .fa,
+        body.dark-mode .sidebar-item.active .sidebar-link .fa-solid,
+        body.dark-mode .sidebar-item:hover > .sidebar-link i,
+        body.dark-mode .sidebar-item:hover .sidebar-link .fas,
+        body.dark-mode .sidebar-item:hover .sidebar-link .fa,
+        body.dark-mode .sidebar-item:hover .sidebar-link .fa-solid {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        body.dark-mode .sidebar-link svg {
+            stroke: #cbd5e1 !important;
+        }
+
+        body.dark-mode .sidebar-item.active .sidebar-link svg,
+        body.dark-mode .sidebar-item:hover .sidebar-link svg {
+            stroke: var(--gateway-primary-color) !important;
+        }
+
+        body.dark-mode .table,
+        body.dark-mode table {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .table thead th,
+        body.dark-mode table thead th {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+
+        body.dark-mode .table tbody tr,
+        body.dark-mode table tbody tr {
+            border-color: #1e293b !important;
+            background-color: transparent !important;
+        }
+
+        body.dark-mode .table tbody td,
+        body.dark-mode table tbody td {
+            color: #e2e8f0 !important;
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .table tbody tr:hover,
+        body.dark-mode table tbody tr:hover {
+            background-color: #1e293b !important;
+        }
+
+        /* Ajuste específico para tabela de Formas de Pagamento */
+        body.dark-mode .card-dash .table,
+        body.dark-mode .card-dash table {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .card-dash .table td,
+        body.dark-mode .card-dash table td {
+            color: #e2e8f0 !important;
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .card-dash .table td.fw-bold,
+        body.dark-mode .card-dash table td.fw-bold {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .card-dash p {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .dropdown-menu {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .dropdown-item {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .dropdown-item:hover {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .dropdown-divider {
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .form-control,
+        body.dark-mode .form-select,
+        body.dark-mode input[type="text"],
+        body.dark-mode select {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .form-control:focus,
+        body.dark-mode .form-select:focus,
+        body.dark-mode input[type="text"]:focus,
+        body.dark-mode select:focus {
+            background-color: #0f172a !important;
+            border-color: var(--gateway-primary-color) !important;
+            color: #e2e8f0 !important;
+            box-shadow: 0 0 0 0.2rem rgba(var(--gateway-primary-color-rgb), 0.25) !important;
+        }
+
+        body.dark-mode .form-select option {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+
+        /* Ajustes específicos para inputs e selects do dashboard */
+        body.dark-mode #custom-period-input,
+        body.dark-mode #periodo-select,
+        body.dark-mode select[name="periodo"] {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode #custom-period-input:focus,
+        body.dark-mode #periodo-select:focus,
+        body.dark-mode select[name="periodo"]:focus {
+            background-color: #0f172a !important;
+            border-color: var(--gateway-primary-color) !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode select[name="periodo"] option {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .nv-topbar {
+            background-color: rgba(15, 23, 42, 0.9) !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .progress {
+            background-color: #1e293b !important;
+        }
+
+        body.dark-mode .progress-bar {
+            background-color: var(--gateway-primary-color) !important;
+        }
+
+        body.dark-mode .dark-mode-toggle-btn:hover {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* Ícone da lua no dark mode - amarelo claro */
+        body.dark-mode .dark-mode-icon {
+            color: #fbbf24 !important;
+        }
+
+        /* Ícone do sol no dark mode - amarelo claro */
+        body.dark-mode .dark-mode-icon.fa-sun {
+            color: #fbbf24 !important;
+        }
+
+        /* Ícone da lua no light mode - escuro para visibilidade */
+        .dark-mode-icon {
+            color: #1f2937 !important;
+        }
+
+        /* Garantir que o ícone seja visível na navbar - light mode */
+        .navbar-theme .dark-mode-icon {
+            color: #1f2937 !important;
+        }
+
+        /* Garantir que o ícone seja visível na navbar - dark mode */
+        body.dark-mode .navbar-theme .dark-mode-icon,
+        body.dark-mode .navbar-theme .dark-mode-icon.fa-moon,
+        body.dark-mode .navbar-theme .dark-mode-icon.fa-sun {
+            color: #fbbf24 !important;
+        }
+
+        /* Forçar cor escura no light mode mesmo com estilos inline */
+        body:not(.dark-mode) .dark-mode-icon,
+        body:not(.dark-mode) .navbar-theme .dark-mode-icon {
+            color: #1f2937 !important;
+        }
+
+        body.dark-mode .menu-hamburguer i {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+            border-color: #1e293b !important;
+        }
+
+        body.dark-mode .modal-header {
+            border-bottom-color: #1e293b !important;
+        }
+
+        body.dark-mode .modal-footer {
+            border-top-color: #1e293b !important;
+        }
+
+        body.dark-mode .btn-close {
+            filter: invert(1) !important;
+        }
+
+        body.dark-mode .alert {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .badge {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .nav-link {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .breadcrumb {
+            background-color: transparent !important;
+        }
+
+        body.dark-mode .breadcrumb-item a {
+            color: #94a3b8 !important;
+        }
+
+        body.dark-mode .breadcrumb-item.active {
+            color: #e2e8f0 !important;
+        }
+
+        /* Labels e textos dentro dos cards no dark mode */
+        body.dark-mode .card label,
+        body.dark-mode .card .form-label,
+        body.dark-mode .card .form-floating > label,
+        body.dark-mode .card h1,
+        body.dark-mode .card h2,
+        body.dark-mode .card h3,
+        body.dark-mode .card h4,
+        body.dark-mode .card h5,
+        body.dark-mode .card h6,
+        body.dark-mode .card-title,
+        body.dark-mode .card .card-title,
+        body.dark-mode .card p,
+        body.dark-mode .card span:not(.badge):not(.btn),
+        body.dark-mode .card small,
+        body.dark-mode .card .text-muted,
+        body.dark-mode .card .valor-visivel,
+        body.dark-mode .card strong,
+        body.dark-mode .card b {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .card .text-muted {
+            color: #94a3b8 !important;
+        }
+
+        /* Ajustes adicionais para card-dash no dark mode */
+        body.dark-mode .card-dash .table-sm td {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .card-dash .table-sm .text-start,
+        body.dark-mode .card-dash .table-sm .text-end {
+            color: #e2e8f0 !important;
+        }
+
+        body.dark-mode .card-dash .fw-bold {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+        }
+
+        /* Balanceamento de saldo - dark mode (cores fixas, máxima especificidade) */
+        body.dark-mode .container-fluid .page-balance .panel,
+        body.dark-mode .main .content .page-balance .panel {
+            background-color: #0f172a !important;
+            border: 1px solid #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .container-fluid .page-balance .panel-title,
+        body.dark-mode .container-fluid .page-balance .panel-sub,
+        body.dark-mode .container-fluid .page-balance label {
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .container-fluid .page-balance .btn-entrada,
+        body.dark-mode .container-fluid .page-balance button.btn-entrada,
+        body.dark-mode .container-fluid .page-balance .btn-saida,
+        body.dark-mode .container-fluid .page-balance button.btn-saida {
+            color: #ffffff !important;
+        }
+        body.dark-mode .container-fluid .page-balance .btn-entrada,
+        body.dark-mode .container-fluid .page-balance button.btn-entrada {
+            background-color: #4f46e5 !important;
+            border: none !important;
+        }
+        body.dark-mode .container-fluid .page-balance .btn-saida,
+        body.dark-mode .container-fluid .page-balance button.btn-saida {
+            background-color: #dc3545 !important;
+            border: none !important;
+        }
+
+        /* Tabelas e cards no dark mode - fundo escuro */
+        body.dark-mode .card .card-body {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .card .card-header {
+            background-color: #0f172a !important;
+            border-bottom-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper .table,
+        body.dark-mode .dataTables_wrapper table {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper thead th {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode .dataTables_wrapper tbody td {
+            color: #e2e8f0 !important;
+            border-color: #1e293b !important;
+        }
+        body.dark-mode .dataTables_wrapper tbody tr {
+            background-color: transparent !important;
+        }
+        body.dark-mode .dataTables_wrapper tbody tr:hover {
+            background-color: #1e293b !important;
+        }
+        body.dark-mode .dataTables_wrapper .dataTables_length,
+        body.dark-mode .dataTables_wrapper .dataTables_filter,
+        body.dark-mode .dataTables_wrapper .dataTables_info {
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper .dataTables_filter input {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper .dataTables_length select {
+            background-color: #0f172a !important;
+            border-color: #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .dataTables_wrapper .paginate_button {
+            background: #1e293b !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode .dataTables_wrapper .paginate_button:hover {
+            background: #334155 !important;
+            color: #fff !important;
+        }
+        body.dark-mode .dataTables_wrapper .paginate_button.current {
+            background: var(--gateway-primary-color) !important;
+            color: #fff !important;
+        }
+
+        /* Extrato - dark mode (layout para garantir especificidade) */
+        body.dark-mode .container-fluid .page-extrato .page-title { color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .panel { background-color: #0f172a !important; border: 1px solid #1e293b !important; color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .filters label { color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .filters select,
+        body.dark-mode .container-fluid .page-extrato .filters input[type="date"] { background-color: #0f172a !important; border: 1px solid #1e293b !important; color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .table-extrato th { background-color: #1e293b !important; color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .table-extrato td { color: #e2e8f0 !important; }
+        body.dark-mode .container-fluid .page-extrato .empty-state { color: #94a3b8 !important; }
+    </style>
+    <script src="{{ asset('assets/js/settings.js') }}"></script>
+
+</head>
+
+<body>
+    <div class="wrapper page-content-fade" style="height:100vh;position:relative;">
+        @include('partials.sidebar')
+
+        <div class="main">
+            @include('partials.navbar')
+            <main class="content" style="height:100vh;overflow-x:hidden;overflow-y:auto;">
+
+                <div class="container-fluid pt-3">
+                    @yield('content')
+                </div>
+            </main>
+        </div>
+        {{-- @include('partials.footer') --}}
+    </div>
+    @stack('modals')
+    <svg width="0" height="0" style="position:absolute">
+        <defs>
+            <symbol viewBox="0 0 512 512" id="ion-ios-pulse-strong">
+                <path
+                    d="M448 273.001c-21.27 0-39.296 13.999-45.596 32.999h-38.857l-28.361-85.417a15.999 15.999 0 0 0-15.183-10.956c-.112 0-.224 0-.335.004a15.997 15.997 0 0 0-15.049 11.588l-44.484 155.262-52.353-314.108C206.535 54.893 200.333 48 192 48s-13.693 5.776-15.525 13.135L115.496 306H16v31.999h112c7.348 0 13.75-5.003 15.525-12.134l45.368-182.177 51.324 307.94c1.229 7.377 7.397 11.92 14.864 12.344.308.018.614.028.919.028 7.097 0 13.406-3.701 15.381-10.594l49.744-173.617 15.689 47.252A16.001 16.001 0 0 0 352 337.999h51.108C409.973 355.999 427.477 369 448 369c26.511 0 48-22.492 48-49 0-26.509-21.489-46.999-48-46.999z">
+                </path>
+            </symbol>
+        </defs>
+    </svg>
+    <script src="{{ asset('assets/js/app.js') }}"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+    <script>
+
+
+        // Define a função no escopo global
+        function showToast(type, message) {
+            Swal.mixin({
+                toast: true,
+                icon: type,
+                title: message,
+                animation: false,
+                position: 'top-right',
+                showConfirmButton: false,
+                showCloseButton: true,
+                timer: 3000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer)
+                    toast.addEventListener('mouseleave', Swal.resumeTimer)
+                }
+            }).fire(); // 🔥 Adiciona o .fire() para exibir o toast!
+        }
+
+        // Espera o DOM carregar antes de mostrar o toast
+        document.addEventListener("DOMContentLoaded", function () {
+            @if (session('success'))
+                showToast('success', "{{ session('success') }}");
+            @endif
+
+            @if (session('error'))
+                showToast('error', "{{ session('error') }}");
+            @endif
+
+            @if (session('info'))
+                showToast('info', "{{ session('info') }}");
+            @endif
+
+            @if (session('warning'))
+                showToast('warning', "{{ session('warning') }}");
+            @endif
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Captura a variável CSS --gateway-primary-color
+            const rootStyles = getComputedStyle(document.documentElement);
+            const primaryColor = rootStyles.getPropertyValue('--gateway-primary-color').trim();
+
+            // Função para converter HEX para RGBA
+            function hexToRgba2(hex, alpha = 0.5) {
+                // Remove "#" se existir
+                hex = hex.replace('#', '');
+
+                // Expande hex curto (ex: #08f)
+                if (hex.length === 3) {
+                    hex = hex.split('').map(c => c + c).join('');
+                }
+
+                const r = parseInt(hex.substring(0, 2), 16);
+                const g = parseInt(hex.substring(2, 4), 16);
+                const b = parseInt(hex.substring(4, 6), 16);
+
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+
+            // Converte e adiciona nova variável CSS
+            const rgbaColor = hexToRgba2(primaryColor, 0.3);
+            document.documentElement.style.setProperty('--gateway-opacity', rgbaColor);
+
+            const rgbaColor2 = hexToRgba2(primaryColor, 0.1);
+            document.documentElement.style.setProperty('--gateway-opacity2', rgbaColor2);
+        });
+    </script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => hljs.highlightAll());
+    </script>
+    <script>
+        // Força qualquer modal Bootstrap a ser filho direto de <body>,
+        // evitando que fique preso em containers com z-index/transform errados.
+        document.addEventListener('DOMContentLoaded', function () {
+            document.body.addEventListener('show.bs.modal', function (event) {
+                var modal = event.target;
+                if (modal && modal.classList.contains('modal')) {
+                    document.body.appendChild(modal);
+                }
+            }, true);
+        });
+    </script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/service-worker.js")
+                .then(() => console.log("✅ Service Worker registrado!"))
+                .catch(err => console.error("❌ Erro no Service Worker:", err));
+        }
+    </script>
+    <script>
+        const manifest = @json($pwa);
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(blob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestURL;
+        document.head.appendChild(link);
+    </script>
+    <!-- <script disable-devtool-auto src='https://cdn.jsdelivr.net/npm/disable-devtool@latest'></script> -->
+
+    <!-- PWA Install Banner - DESABILITADO -->
+    {{-- <div id="pwa-banner" class="fixed-bottom bg-light border-top shadow p-3 d-none">
+        <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <!-- App Info -->
+            <div class="d-flex align-items-center">
+                <img src="{{ $pwa['icons'][0]['src'] }}" alt="App Icon" class="rounded me-3"
+                    style="width:50px; height:50px;">
+                <div>
+                    <strong>{{ $pwa['name'] . ' APP' ?? 'Nosso App' }}</strong><br>
+                    <small class="text-muted">Instale o app para melhor experiência!</small>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="btn-install-app d-flex align-items-center justify-content-end mt-2 mt-md-0 gap-2 w-100">
+                <button id="pwa-install-btn" class="btn btn-primary">Instalar</button>
+                <button id="pwa-banner-close" class="btn btn-outline-dark">Fechar</button>
+            </div>
+        </div>
+
+        <!-- iOS Instructions -->
+        <div id="ios-instructions" class="mt-2 text-muted small d-none w-100 text-center">
+            Para instalar no iOS: toque no ícono de
+            <img src="https://img.icons8.com/ios-glyphs/20/000000/share-rounded.png" style="vertical-align:middle;">
+            e depois em <br><strong>"Adicionar à Tela de Início"</strong>
+            <img src="https://img.icons8.com/ios-glyphs/20/000000/home-page.png" style="vertical-align:middle;">
+            <br>
+            <button id="pwa-banner-close" class="btn btn-outline-dark"
+                style="position: absolute;top: 6px; right: 6px;border-radius:60px !important;">x</button>
+        </div>
+    </div> --}}
+
+    {{-- Modal de Confirmação PWA - DESABILITADO --}}
+    {{-- <div class="modal fade" id="pwaHideModal" tabindex="-1" aria-labelledby="pwaHideModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-3">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pwaHideModalLabel">Ocultar Notificação</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Por quanto tempo deseja ocultar esta notificação?</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="hideOption" id="hideToday" value="today"
+                            checked>
+                        <label class="form-check-label" for="hideToday">Somente hoje</label>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="radio" name="hideOption" id="hideForever" value="week">
+                        <label class="form-check-label" for="hideForever">Por uma semana</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="confirmHideBtn" type="button" class="btn btn-primary">Confirmar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div> --}}
+
+    @php
+        $fcm = \App\Helpers\Helper::getFCM();
+        $mydevices = \App\Helpers\Helper::myTokensDevices(auth()->user()->id);
+    @endphp
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function (ev) {
+            let devices = @json($mydevices);
+            // Popup de notificação removido
+        })
+    </script>
+    <!-- Firebase v7 CDN -->
+    <script src="https://www.gstatic.com/firebasejs/7.23.0/firebase.js"></script>
+
+    <script>
+
+        let firebaseConfig = @json($fcm);
+        
+        // Só inicializa Firebase se houver configuração válida com projectId
+        if (firebaseConfig && firebaseConfig.projectId) {
+            try {
+                firebase.initializeApp(firebaseConfig);
+
+                const messaging = firebase.messaging();
+                window.messaging = messaging;
+
+                window.messaging.onMessage(function (payload) {
+                    showToast('success', payload.notification.body)
+                    const title = payload.notification?.title || payload.data?.title;
+                    const body = payload.notification?.body || payload.data?.body;
+                    const icon = payload.notification?.icon || payload.data?.icon || '/storage/default-icon.png';
+
+                    if (Notification.permission === "granted" && title && body) {
+                        new Notification(title, { body, icon, badge: icon });
+                    }
+
+                    if (Notification.permission !== "granted") {
+                        Notification.requestPermission().then(function (permission) {
+                        });
+                    }
+                });
+
+                if ('serviceWorker' in navigator) {
+                    // Força atualização do service worker
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                        for(let registration of registrations) {
+                            registration.update();
+                        }
+                    });
+                    
+                    navigator.serviceWorker.register('/api/firebase-messaging-sw')
+                        .then(function (registration) {
+                            console.log("Service Worker registrado com sucesso:", registration);
+                            // Força atualização imediata
+                            registration.update();
+                        })
+                        .catch(function (err) {
+                            console.error("Falha ao registrar Service Worker:", err);
+                        });
+                    
+                    // Registra também o service-worker.js se existir
+                    if (typeof navigator.serviceWorker !== 'undefined') {
+                        navigator.serviceWorker.register('/service-worker.js')
+                            .then(function(registration) {
+                                console.log("Service Worker PWA registrado:", registration);
+                                registration.update();
+                            })
+                            .catch(function(err) {
+                                // Ignora erro se o arquivo não existir
+                            });
+                    }
+                }
+            } catch (error) {
+                console.warn("Erro ao inicializar Firebase:", error);
+            }
+        } else {
+            console.warn("Firebase não configurado. Configure o Firebase nas configurações do sistema.");
+        }
+    </script>
+
+    <script>
+        function initFirebaseMessagingRegistration() {
+            window.messaging
+                .requestPermission()
+                .then(function () {
+                    return messaging.getToken();
+                })
+                .then(async function (token) {
+                    const { id: deviceId, source } = await getOrCreateDeviceId();
+                    console.log("Token do usuário:", token);
+                    // Envia o token para o servidor
+                    $.ajaxSetup({
+                        headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+                    });
+                    $.ajax({
+                        url: '{{ route("save-token") }}',
+                        type: 'POST',
+                        data: { token: token, device: deviceId },
+                        success: function (res) {
+                            showToast('success', 'Notificações aceitas.');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 2000)
+                        },
+                        error: function (err) { console.log(err); }
+                    });
+                })
+                .catch(function (err) {
+                    console.log('Erro ao obter token:', err);
+                });
+        }
+
+        let fcm = @json($fcm);
+        // Botão de registro
+        if (fcm?.projectId) {
+            let btnAddDevice = document.getElementById('enable-notifications-btn');
+            if (btnAddDevice) {
+                btnAddDevice.addEventListener('click', initFirebaseMessagingRegistration);
+
+            }
+        }
+    </script>
+
+
+    {{-- PWA Install Script - DESABILITADO --}}
+    {{-- <script>
+
+        document.addEventListener('DOMContentLoaded', function () {
+            let deferredPrompt;
+
+            const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+            const isInStandaloneMode = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            console.log({ isIos, isInStandaloneMode })
+            window.addEventListener('load', () => {
+                const banner = document.getElementById('pwa-banner');
+
+                if (!isInStandaloneMode()) {
+                    banner.classList.remove('d-none');
+                    if (isIos()) {
+                        document.getElementById('ios-instructions').classList.remove('d-none');
+                    }
+                } else {
+                    console.log('APP INSTALADO');
+                }
+            });
+
+            // Evento beforeinstallprompt
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+            });
+
+            // Botão instalar
+            document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log('PWA installation outcome:', outcome);
+                    deferredPrompt = null;
+                    document.getElementById('pwa-banner').classList.add('d-none');
+                } else if (isIos()) {
+                    showToast('info', 'Use o botão de compartilhar do Safari e selecione "Adicionar à Tela de Início".');
+                }
+            });
+        })
+    </script> --}}
+
+    <script>
+        // gerar UUID v4 simples
+        function generateUUID() {
+            // source: RFC4122-ish
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            });
+        }
+
+        function saveDeviceId(id) {
+            try {
+                localStorage.setItem('my_device_id', id);
+                // cookie fallback (30 dias)
+                document.cookie = `my_device_id=${id};max-age=${60 * 60 * 24 * 30};path=/;SameSite=Lax`;
+            } catch (e) {
+                // localStorage pode falhar em alguns modos privados
+                document.cookie = `my_device_id=${id};max-age=${60 * 60 * 24 * 30};path=/;SameSite=Lax`;
+            }
+        }
+
+        function readDeviceIdFromCookie() {
+            return document.cookie.split('; ').reduce((acc, pair) => {
+                const [k, v] = pair.split('=');
+                if (k === 'my_device_id') acc = v;
+                return acc;
+            }, null);
+        }
+
+        async function getOrCreateDeviceId() {
+            // 1) tentar localStorage
+            try {
+                const existing = localStorage.getItem('my_device_id');
+                if (existing) return { id: existing, source: 'localStorage' };
+            } catch (e) {
+                // continue
+            }
+
+            // 2) tentar cookie
+            const cookieId = readDeviceIdFromCookie();
+            if (cookieId) {
+                try { localStorage.setItem('my_device_id', cookieId); } catch (_) { }
+                return { id: cookieId, source: 'cookie' };
+            }
+
+            // 4) gerar novo UUID e salvar
+            const uuid = generateUUID();
+            saveDeviceId(uuid);
+            return { id: uuid, source: 'generated' };
+        }
+
+
+    </script>
+
+    {{-- PWA Banner Script - DESABILITADO --}}
+    {{-- <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const banner = document.getElementById("pwa-banner");
+            const closeButtons = document.querySelectorAll("#pwa-banner-close");
+            const modalEl = document.getElementById("pwaHideModal");
+            const confirmHideBtn = document.getElementById("confirmHideBtn");
+            const modal = new bootstrap.Modal(modalEl);
+
+            // Função para verificar se o banner deve aparecer
+            function shouldShowBanner() {
+                const hideData = JSON.parse(localStorage.getItem("pwaHideData"));
+                if (!hideData) return true; // nunca ocultou
+
+                const now = new Date();
+                const expires = new Date(hideData.expires);
+
+                // Se a data de expiração ainda não passou, não mostrar
+                return now > expires;
+            }
+
+            // Exibir banner somente se permitido
+            if (shouldShowBanner()) {
+                banner.classList.remove("d-none");
+            }
+
+            // Ao clicar em "Fechar", abre o modal
+            closeButtons.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    modal.show();
+                });
+            });
+
+            // Quando confirmar a escolha
+            confirmHideBtn.addEventListener("click", () => {
+                const selected = document.querySelector("input[name='hideOption']:checked").value;
+                const hideUntil = new Date();
+
+                if (selected === "today") {
+                    // Oculta até o final do dia atual
+                    hideUntil.setHours(23, 59, 59, 999);
+                } else if (selected === "week") {
+                    // Oculta por 7 dias
+                    hideUntil.setDate(hideUntil.getDate() + 7);
+                }
+
+                // Salva a escolha
+                localStorage.setItem("pwaHideData", JSON.stringify({
+                    expires: hideUntil.toISOString(),
+                    choice: selected
+                }));
+
+                // Fecha modal e oculta o banner
+                modal.hide();
+                banner.classList.add("d-none");
+            });
+        });
+    </script> --}}
+
+    <!-- Dark Mode Toggle Script -->
+    <script>
+        (function() {
+            // Função para aplicar dark mode
+            function applyDarkMode(isDark) {
+                if (isDark) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('darkMode', 'enabled');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('darkMode', 'disabled');
+                }
+            }
+
+            // Função para alternar dark mode
+            function toggleDarkMode() {
+                const isDark = document.body.classList.contains('dark-mode');
+                applyDarkMode(!isDark);
+                
+                // Atualizar ícone
+                const icon = document.querySelector('.dark-mode-icon');
+                if (icon) {
+                    if (!isDark) {
+                        icon.classList.remove('fa-moon');
+                        icon.classList.add('fa-sun');
+                    } else {
+                        icon.classList.remove('fa-sun');
+                        icon.classList.add('fa-moon');
+                    }
+                }
+            }
+
+            // Verificar preferência salva ou do sistema
+            function initDarkMode() {
+                const savedMode = localStorage.getItem('darkMode');
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                // Se não houver preferência salva, usar a do sistema
+                const shouldEnable = savedMode === null 
+                    ? prefersDark 
+                    : savedMode === 'enabled';
+
+                applyDarkMode(shouldEnable);
+                
+                // Atualizar ícone inicial
+                const icon = document.querySelector('.dark-mode-icon');
+                if (icon && shouldEnable) {
+                    icon.classList.remove('fa-moon');
+                    icon.classList.add('fa-sun');
+                }
+            }
+
+            // Inicializar quando o DOM estiver pronto
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initDarkMode);
+            } else {
+                initDarkMode();
+            }
+
+            // Adicionar event listener ao botão
+            document.addEventListener('DOMContentLoaded', function() {
+                const toggleBtn = document.getElementById('darkModeToggle');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', toggleDarkMode);
+                }
+            });
+
+            // Escutar mudanças na preferência do sistema
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                // Só aplicar se não houver preferência salva
+                if (!localStorage.getItem('darkMode')) {
+                    applyDarkMode(e.matches);
+                    const icon = document.querySelector('.dark-mode-icon');
+                    if (icon) {
+                        if (e.matches) {
+                            icon.classList.remove('fa-moon');
+                            icon.classList.add('fa-sun');
+                        } else {
+                            icon.classList.remove('fa-sun');
+                            icon.classList.add('fa-moon');
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+<!-- <script disable-devtool-auto src="https://cdn.jsdelivr.net/npm/disable-devtool@latest"></script> --> 
+</body>
+
+</html>

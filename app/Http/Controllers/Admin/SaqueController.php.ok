@@ -1,0 +1,263 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\{Setting, TransactionIn, TransactionOut, User};
+use App\Traits\WitetecTrait;
+use Illuminate\Http\Request;
+use App\Traits\{CashtimeTrait, SixxpaymentsTrait, EfiTrait};
+use App\Helpers\Helper;
+use Carbon\Carbon;
+
+class SaqueController extends Controller
+{
+    public function index(Request $request)
+    {
+
+        if(auth()->user()->permission !== 'admin'){
+            return redirect()->route('dashboard');
+        }
+        $periodo = $request->input('periodo', 'dia');
+        $start   = $request->input('start');
+        $end     = $request->input('end');
+
+        // --- define janelas ---
+        switch ($periodo) {
+            case 'dia':
+                $inicioAtual   = Carbon::now()->startOfDay();
+                $fimAtual      = Carbon::now()->endOfDay();
+                $inicioAnterior = Carbon::yesterday()->startOfDay();
+                $fimAnterior    = Carbon::yesterday()->endOfDay();
+                break;
+
+            case 'semana':
+                $inicioAtual   = Carbon::now()->startOfWeek();
+                $fimAtual      = Carbon::now()->endOfWeek();
+                $inicioAnterior = Carbon::now()->subWeek()->startOfWeek();
+                $fimAnterior    = Carbon::now()->subWeek()->endOfWeek();
+                break;
+
+            case 'mes':
+                $inicioAtual   = Carbon::now()->startOfMonth();
+                $fimAtual      = Carbon::now()->endOfMonth();
+                $inicioAnterior = Carbon::now()->subMonth()->startOfMonth();
+                $fimAnterior    = Carbon::now()->subMonth()->endOfMonth();
+                break;
+
+            case 'tudo':
+                $inicioAtual   = Carbon::create(2020, 1, 1);
+                $fimAtual      = Carbon::now();
+                $inicioAnterior = Carbon::create(2019, 1, 1);
+                $fimAnterior    = Carbon::create(2019, 12, 31);
+                break;
+
+            case 'custom':
+                $inicioAtual   = Carbon::parse($start)->startOfDay();
+                $fimAtual      = Carbon::parse($end)->endOfDay();
+                // anterior = mesmo intervalo retrocedido
+                $diff = $inicioAtual->diffInDays($fimAtual) + 1;
+                $inicioAnterior = (clone $inicioAtual)->subDays($diff);
+                $fimAnterior    = (clone $fimAtual)->subDays($diff);
+                break;
+
+            default:
+                $inicioAtual   = Carbon::now()->startOfDay();
+                $fimAtual      = Carbon::now()->endOfDay();
+                $inicioAnterior = Carbon::yesterday()->startOfDay();
+                $fimAnterior    = Carbon::yesterday()->endOfDay();
+        }
+
+        // --- coleção usada na tabela ---
+        $saques = TransactionOut::with('user')
+            ->whereBetween('created_at', [$inicioAtual, $fimAtual])
+            ->get();
+
+        $pendentes = TransactionOut::with('user')
+            ->where('status', 'pendente')
+            ->whereBetween('created_at', [$inicioAtual, $fimAtual])
+            ->get();
+
+
+        $sum = fn($status, $campo, $inicio = null, $fim = null)
+        => TransactionIn::where('status', $status)
+            ->whereBetween('created_at', [$inicio ?? $inicioAtual, $fim ?? $fimAtual])
+            ->sum($campo) ?? 0.0;
+
+        // --- vendas ---
+        $saquesAnterior = $sum('pago', 'amount', $inicioAnterior, $fimAnterior);
+        $saquesAtual    = $sum('pago', 'amount');
+        $crescimento    = $this->calcularCrescimento($saquesAnterior, $saquesAtual);
+
+        $pendentesAnterior  = $sum('pendente', 'amount', $inicioAnterior, $fimAnterior);
+        $pendentesAtual     = $sum('pendente', 'amount');
+        $abandono           = $this->calcularCrescimento($pendentesAnterior, $pendentesAtual);
+
+        $canceladoAnterior  = $sum('cancelado', 'amount', $inicioAnterior, $fimAnterior);
+        $canceladoAtual     = $sum('cancelado', 'amount');
+        $cancelado          = $this->calcularCrescimento($canceladoAnterior, $canceladoAtual);
+
+        return view('pages.admin.saques', compact(
+            'saques',
+            'saquesAnterior',
+            'saquesAtual',
+            'crescimento',
+            'abandono',
+            'pendentes',
+            'cancelado'
+        ));
+    }
+
+    private function calcularCrescimento($anterior, $atual)
+    {
+        if ($anterior > 0) {
+            return (($atual - $anterior) / $anterior) * 100;
+        } elseif ($atual > 0 && $anterior == 0) {
+            return 100;
+        }
+        return 0;
+    }
+
+    public function indexAprovar(Request $request)
+    {
+        if(auth()->user()->permission !== 'admin'){
+            return redirect()->route('dashboard');
+        }
+
+        $saques = TransactionOut::where('status', 'pendente')->where('descricao_transacao','WEB')->get();
+        return view('pages.admin.aprovar-saques', compact('saques'));
+    }
+    public function aprovar(Request $request)
+    {
+        $id = $request->input('id');
+        if (!$id) {
+            return back()->with("error", "ID de saque não fornecido.");
+        }
+        if (auth()->user()->permission != 'admin') {
+            return back()->with("error", "Usuário sem permissões.");
+        }
+
+        $setting = Setting::first();
+        // Normaliza o adquirente (lowercase e remove espaços)
+        $adquirencia = strtolower(trim($setting->adquirencia ?? ''));
+        
+        // Lista de adquirentes que NÃO suportam cash_out automatizado
+        $adquirentesSemCashOut = ['pagarme', 'pagar.me'];
+        
+        if (in_array($adquirencia, $adquirentesSemCashOut)) {
+            return redirect()->back()->with('error', 'Este adquirente não suporta aprovação automática. Use a "Aprovação Manual".');
+        }
+        
+        switch ($adquirencia) {
+            case 'cashtime':
+                $response = CashtimeTrait::liberarSaqueManual($id);
+                break;
+            case 'sixxpayments':
+                $response = SixxpaymentsTrait::liberarSaqueManualSixxpayments($id);
+                break;
+            case 'efi':
+                $response = EfiTrait::liberarSaqueManualEfi($id);
+                break;
+             case 'witetec':
+                $response = WitetecTrait::liberarSaqueManualWitetec($id);
+                break;
+            default:
+                return redirect()->back()->with('error', 'Nenhum adquirente selecionado!');
+                break;
+        }
+
+        return redirect()->back()->with('success', 'Saque aprovado com sucesso!');
+    }
+    
+    public function aprovarManual(Request $request)
+    {
+        $id = $request->input('id');
+        if (!$id) {
+            return back()->with("error", "ID de saque não fornecido.");
+        }
+        if (auth()->user()->permission != 'admin') {
+            return back()->with("error", "Usuário sem permissões.");
+        }
+
+        $saque = TransactionOut::where('id', $id)->first();
+        if (!$saque) {
+            return back()->with("error", "Solicitação de saque não encontrado.");
+        }
+
+        // Atualiza o status para pago
+        $saque->update(['status' => 'pago']);
+        
+        // Atualiza informações do usuário
+        $user = User::where('id', $saque->user_id)->first();
+        $user->decrement('valor_saque_pendente', $saque->amount);
+        $user->save();
+
+        Helper::calculaSaldoLiquido($user->user_id);
+
+        return redirect()->back()->with('success', 'Saque aprovado manualmente com sucesso!');
+    }
+    public function rejeitar(Request $request)
+    {
+        $id = $request->input('id');
+        if (!$id) {
+            return back()->with("error", "ID de saque não fornecido.");
+        }
+        if(auth()->user()->permission !== 'admin'){
+            return redirect()->route('dashboard');
+        }
+        
+        $saque = TransactionOut::where('id', $id)->first();
+        if (!$saque) {
+            return back()->with("error", "Solicitação de saque não encontrado.");
+        }
+
+        $saque->update(['status' => 'cancelado']);
+        $user = User::where('id', $saque->user_id)->first();
+        $user->increment('transacoes_recused', 1);
+        $user->decrement('valor_saque_pendente', $saque->amount);
+        $user->save();
+
+        Helper::calculaSaldoLiquido($user->user_id);
+
+        return redirect()->route('admin.aprovar.saques.index')->with('success', 'Saque rejeitado com sucesso!');
+    }
+
+    public function addsaida(Request $request)
+    {
+        if(auth()->user()->permission !== 'admin'){
+            return redirect()->route('dashboard');
+        }
+
+        $data = $request->all();
+        $user = User::find($data['saque_id']);
+        $idTransaction = uniqid('balance_out_');
+
+        $pixcashout = [
+            "user_id"               => $data['saque_id'],
+            "external_id"           => $idTransaction,
+            "amount"                => $data['saque_amount'],
+            "recebedor_name"        => $user->name,
+            "recebedor_cpf"         => $user->cpf ?? '0000000000',
+            "pixKey"                => 'balance',
+            "pixKeyType"            => 'balance',
+            "status"                => "pago",
+            "type"                  => "cash",
+            "idTransaction"         => $idTransaction,
+            "end2end"               => $idTransaction,
+            "taxa_cash_out"         => 0,
+            "taxa_fixa"             => 0,
+            "plataforma"            => 'web',
+            "cash_out_liquido"      => $data['saque_amount'],
+            "request_ip"            => 'web',
+            "request_domain"        => 'web',
+            "end_to_end"            => $idTransaction,
+            "callbackUrl"           => 'web',
+            "descricao_transacao"   => 'Saldo adcionado manualmente'
+        ];
+
+        TransactionOut::create($pixcashout);
+
+        return redirect()->back()->with('success', 'Saída adicionada com sucesso!');
+    }
+    
+}

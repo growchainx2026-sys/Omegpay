@@ -1,0 +1,840 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Api\DepositController;
+use App\Models\Affiliate;
+use App\Models\AffiliateHistory;
+use App\Models\Cupon;
+use App\Models\Efi;
+use App\Models\Pagarme;
+use App\Models\Pedido;
+use App\Models\Produto;
+use App\Models\Setting;
+use App\Models\Stripe;
+use App\Models\TransactionIn;
+use App\Models\User;
+use App\Traits\PagarmeTrait;
+use App\Traits\Tracking\UtmfyTrait;
+use Illuminate\Http\Request;
+use App\Traits\EfiTrait;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+class PedidoController extends Controller
+{
+    public function index(Request $request)
+    {
+        $user = auth()->user();
+        switch ($request->input('status')) {
+            case 'aprovados':
+                $pedidos = Pedido::whereHas('produto.user', function ($query) use ($user) {
+                    $query->where('id', $user->id);
+                })->whereIn('status', ['pago', 'revisao'])->orderBy('created_at', 'desc')->get();
+                break;
+            case 'chargeback':
+            case 'reembolsados':
+            case 'med':
+                $pedidos = Pedido::whereHas('produto.user', function ($query) use ($user) {
+                    $query->where('id', $user->id);
+                })->where('status', 'cancelado')->orderBy('created_at', 'desc')->get();
+                break;
+            case 'pendentes':
+                $pedidos = Pedido::whereHas('produto.user', function ($query) use ($user) {
+                    $query->where('id', $user->id);
+                })->where('status', 'pendente')->orderBy('created_at', 'desc')->get();
+                break;
+            default:
+                $pedidos = Pedido::whereHas('produto.user', function ($query) use ($user) {
+                    $query->where('id', $user->id);
+                })->orderBy('created_at', 'desc')->get();
+                break;
+        }
+
+        $vendas = Pedido::whereHas('produto.user', function ($query) use ($user) {
+            $query->where('id', $user->id);
+        })->orderBy('created_at', 'desc')->get();
+        return view("pages.pedido", compact('pedidos', 'vendas'));
+    }
+
+    public function order(Request $request)
+    {
+        $data = $request->all();
+
+        switch ($data['pagamento']['metodo']) {
+            case 'pix':
+                return self::paymentPix($request, $data);
+                break;
+            case 'cartao':
+                return self::paymentCard($request, $data);
+                break;
+            case 'boleto':
+                return self::paymentBillet($request, $data);
+                break;
+            default:
+                # code...
+                break;
+        }
+    }
+
+    protected static function paymentPix(Request $request, $data)
+    {
+        // ... (parte inicial do código para criar o pedido permanece a mesma) ...
+        $dados = [
+            'produto_id' => $data['produto']['id'],
+            'valor' => $data['preco'],
+            'bumps' => $data['bumps'],
+            'metodo' => "pix",
+            'comprador' => $data['comprador'],
+            'pagamento' => $data['pagamento']
+        ];
+
+        if (!empty($data['produto']['desconto'] && !empty($data['produto']['desconto_id']))) {
+            $cupom = Cupon::where('id', $data['produto']['desconto_id'])->first();
+            if ($cupom) {
+                $cupom->increment('usage', 1);
+                $dados['cupon_code'] = $cupom->codigo;
+                $dados['cupon_desconto'] = $cupom->desconto;
+                $data['preco'] = $dados['valor'];
+            }
+        }
+
+        $pedido = Pedido::create($dados);
+        if ($pedido) {
+            $user = User::where('id', $data['produto']['user']['id'])->first();
+            $payload = [
+                'user' => $user,
+                'token' => $data['produto']['user']['clientId'],
+                'secret' => $data['produto']['user']['secret'],
+                'amount' => $data['preco'],
+                'debtor_name' => $data['comprador']['name'],
+                'email' => $data['comprador']['email'],
+                'debtor_document_number' => str_replace(['(', ')', ' ', '-', '.'], '', $data['comprador']['cpf']),
+                'phone' => str_replace(['(', ')', ' ', '-', '.'], '', $data['comprador']['phone']),
+                'method_pay' => "pix",
+                'postback' => 'checkout',
+            ];
+
+            $requestHttp = new Request($payload);
+            $transaction = DepositController::deposit($requestHttp);
+            $idTransaction = json_decode($transaction->content(), true)['idTransaction'];
+
+            $transacaoUnica = TransactionIn::where('idTransaction', $idTransaction)->first();
+            if (!$transacaoUnica) {
+                return response()->json(['error' => 'Transação não encontrada'], 404);
+            }
+
+            $pedido->idTransaction = $idTransaction;
+            $setting = Setting::first();
+
+            $participantes = [];
+            $porcentagemTotalDistribuida = 0;
+
+            if (isset($data['affiliate_ref'])) {
+                $afiliado = Affiliate::where('ref', $data['affiliate_ref'])->first();
+                if ($afiliado) {
+                    $porcentagem = (float) $afiliado->percentage;
+                    $participantes['afiliado'] = [
+                        'user_id' => $afiliado->user_id,
+                        'user_name' => $afiliado->user->name,
+                        'porcentagem' => $porcentagem,
+                        'descricao' => 'AFILIADO'
+                    ];
+                    $porcentagemTotalDistribuida += $porcentagem;
+                }
+            }
+
+            if ($pedido->produto->coproducao) {
+                $coproducao = $pedido->produto->coproducao;
+                $porcentagem = (float) $coproducao->percentage;
+                $participantes['coprodutor'] = [
+                    'user_id' => $coproducao->user_id,
+                    'user_name' => $coproducao->user->name,
+                    'porcentagem' => $porcentagem,
+                    'descricao' => 'COPRODUCAO'
+                ];
+                $porcentagemTotalDistribuida += $porcentagem;
+            }
+
+            $porcentagemVendedor = 100 - $porcentagemTotalDistribuida;
+            $participantes['vendedor'] = [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'porcentagem' => $porcentagemVendedor,
+                'descricao' => 'VENDEDOR'
+            ];
+
+            // Itera sobre cada participante para criar sua transação de split.
+            foreach ($participantes as $chave => $parte) {
+                // A fatia bruta (amount) é sempre proporcional para todos.
+                $fatiaBruta = (float) bcmul($transacaoUnica->amount, ($parte['porcentagem'] / 100), 2);
+
+                // ### LÓGICA DE TAXAS CORRIGIDA ###
+                $fatiaTaxa = 0;
+                $cashInLiquidoAntesReserva = 0;
+
+                if ($chave === 'vendedor') {
+                    // NOVO: A taxa TOTAL da transação é aplicada SOMENTE ao vendedor.
+                    $fatiaTaxa = (float) $transacaoUnica->taxa_cash_in;
+                    $cashInLiquidoAntesReserva = (float) bcsub($fatiaBruta, $fatiaTaxa, 2);
+                } else {
+                    // NOVO: Afiliados e coprodutores NÃO têm taxa. O líquido deles é igual ao bruto.
+                    $fatiaTaxa = 0;
+                    $cashInLiquidoAntesReserva = $fatiaBruta;
+                }
+
+                $payloadSplit = $transacaoUnica->toArray();
+                $payloadSplit['type'] = 'split';
+                $payloadSplit['user_id'] = $parte['user_id'];
+                $payloadSplit['descricao_transacao'] = $parte['descricao'];
+                $payloadSplit['amount'] = $fatiaBruta;
+                $payloadSplit['taxa_cash_in'] = $fatiaTaxa;
+                $payloadSplit['cash_in_liquido'] = $cashInLiquidoAntesReserva;
+                $payloadSplit['taxa_reserva'] = 0;
+
+                // A taxa de reserva é calculada sobre o líquido individual de cada um.
+                if ($setting && $setting->taxa_reserva > 0) {
+                    $reserva = (float) bcmul($cashInLiquidoAntesReserva, ($setting->taxa_reserva / 100), 2);
+                    $payloadSplit['taxa_reserva'] = $reserva;
+                    $payloadSplit['dias_liberar_reserva'] = $setting->dias_liberar_reserva;
+                    $payloadSplit['taxa_reserva_resgatada'] = false;
+                    $payloadSplit['cash_in_liquido'] = (float) bcsub($cashInLiquidoAntesReserva, $reserva, 2);
+                }
+
+                TransactionIn::create($payloadSplit);
+
+                if ($chave === 'afiliado') {
+                    $pedido->afiliado = ['name' => $parte['user_name'], 'porcentage' => $parte['porcentagem'], 'comission' => $fatiaBruta];
+                    AffiliateHistory::create(['amount' => $fatiaBruta, 'status' => 'pendente', 'user_id' => $parte['user_id'], 'pedido_id' => $pedido->id]);
+                } elseif ($chave === 'coprodutor') {
+                    $pedido->coprodutor = ['name' => $parte['user_name'], 'porcentage' => $parte['porcentagem'], 'comission' => $fatiaBruta];
+                } elseif ($chave === 'vendedor') {
+                    $pedido->valor_liquido = $cashInLiquidoAntesReserva;
+                    $pedido->taxa = $fatiaTaxa;
+                }
+            }
+
+            $transacaoUnica->delete();
+            $pedido->save();
+
+            if ($user->utmfy) {
+                $ip = $request->header('X-Forwarded-For') ?: ($request->header('CF-Connecting-IP') ?: $request->ip());
+                UtmfyTrait::gerarUTM('pix', 'waiting_payment', $pedido->idTransaction, $pedido->produto, $user->utmfy, $ip);
+            }
+
+            return $transaction;
+        }
+    }
+
+    protected static function paymentCard($request, $data)
+    {
+        /* RECEBENDO affiliate_ref
+            AGORA SO TRATAR OS DADOS PARA PAGAMENTO DO AFILIADO
+        */
+
+        $user = Produto::where('id', $data['produto']['id'])->first()->user;
+        $request->user = $user;
+
+        $dados = [
+            'produto_id' => $data['produto']['id'],
+            'valor' => $data['preco'],
+            'bumps' => $data['bumps'],
+            'metodo' => "cartao",
+            'comprador' => $data['comprador'],
+            'pagamento' => $data['pagamento']
+        ];
+
+        if (!empty($data['produto']['desconto'] && !empty($data['produto']['desconto_id']))) {
+            $cupom = Cupon::where('id', $data['produto']['desconto_id'])->first();
+            $cupom->increment('usage', 1);
+            if ($cupom) {
+                $dados['cupon_code'] = $cupom->codigo;
+                $dados['cupon_desconto'] = $cupom->desconto;
+
+                $data['preco'] = $dados['valor'];
+            }
+        }
+
+        $pedido = Pedido::create($dados);
+
+        $adquirencia = Setting::first()->adquirencia_card;
+        switch ($adquirencia) {
+            case 'efi':
+                $custom_id = Str::uuid()->toString();
+
+                $payload = [
+                    "items" => [
+                        [
+                            "name" => $data['produto']['name'],
+                            "value" => $data['preco'] * 100,
+                            "amount" => 1
+                        ]
+                    ],
+                    "payment" => [
+                        "credit_card" => [
+                            "customer" => [
+                                "name" => $data['comprador']['name'],
+                                "cpf" => str_replace(['.', '-'], '', $data['comprador']['cpf']),
+                                "email" => $data['comprador']['email'],
+                                "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['comprador']['phone'])
+                            ],
+                            "installments" => (int) $data['pagamento']['parcelas'],
+                            "payment_token" => $data['pagamento']['payment_token'],
+                        ]
+                    ],
+                    "metadata" => [
+                        "custom_id" => $custom_id,
+                        "notification_url" => url('api/efi/callback/card')
+                    ],
+                    "pedido_uuid" => $pedido->uuid
+                ];
+
+                $efi = Efi::first();
+
+
+                $amount = $data['preco'];
+                $taxa_percent = $efi->card_tx_percent;
+                $taxa_fixed = $efi->card_tx_fixed;
+                $deposito_liquido = $amount - $taxa_fixed;
+                $deposito_liquido -= (float) $amount * $taxa_percent / 100;
+
+                $setting = Setting::first();
+                $dias_recebimento = $setting->card_days_to_release;
+
+                switch ($user->plan_card) {
+                    case 'opt1':
+                        $dias_recebimento = $setting->card_days_to_anticipation_opt1;
+                        $deposito_liquido -= $amount * $setting->card_tx_to_anticipation_opt1 / 100;
+                        break;
+                    case 'opt2':
+                        $dias_recebimento = $setting->card_days_to_anticipation_opt2;
+                        $deposito_liquido -= $amount * $setting->card_tx_to_anticipation_opt2 / 100;
+                        break;
+                    default:
+                        break;
+                }
+
+                $pedido->valor_liquido = $deposito_liquido;
+                $pedido->taxa = $amount - $deposito_liquido;
+                $pedido->save();
+
+
+                $transaction = EfiTrait::requestPaymentCard($request, $payload, $user);
+
+                $content = json_decode($transaction->content(), true);
+
+                if (isset($content['status']) && isset($content['uuid'])) {
+                    $idTransaction = $content['uuid'];
+                    $transacaoUnica = TransactionIn::where('idTransaction', $idTransaction)->first();
+
+                    if ($transacaoUnica) {
+                        // Define o status inicial e chama a lógica de split
+                        $status = $content['status'] ? 'revisao' : 'cancelado';
+                        self::_handleSplitLogic($transacaoUnica, $pedido, $data, $user, $status);
+                    }
+                }
+
+                return $transaction;
+            case 'pagarme':
+                $payload = [
+                    "items" => [
+                        [
+                            "name" => $data['produto']['name'],
+                            "value" => $data['preco'] * 100,
+                            "amount" => 1
+                        ]
+                    ],
+                    'description' => 'Pgto. ' . $pedido->produto->name,
+                    "cartao" => [
+                        "number" => $data['pagamento']['numero'],
+                        "holder_name" => $data['pagamento']["nomeCartao"],
+                        "exp_month" => explode('/', $data['pagamento']['validade'])[0],
+                        "exp_year" => "20" . explode('/', $data['pagamento']['validade'])[1],
+                        "cvv" => $data['pagamento']['cvv']
+                    ],
+                    'installments' => (int) $data['pagamento']['parcelas'],
+                    "payment" => [
+                        "credit_card" => [
+                            "customer" => [
+                                "name" => $data['comprador']['name'],
+                                "cpf" => str_replace(['.', '-'], '', $data['comprador']['cpf']),
+                                "email" => $data['comprador']['email'],
+                                "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['comprador']['phone'])
+                            ]
+                        ]
+                    ],
+                    'customer' => $data['comprador'],
+                    'pedido_uuid' => $pedido->uuid
+
+                ];
+
+                $setting = Setting::first();
+                $pm = Pagarme::first();
+                $vezes = $data['pagamento']['parcelas'] . 'x';
+
+                if ($data['pagamento']['parcelas'] == 1) {
+                    $amount = $data['preco'] / 100;
+                    $taxa_percent = $setting->card_taxa_percent;
+                    $taxa_fixed = $setting->card_taxa_fixed;
+                    $deposito_liquido = $amount - $taxa_fixed;
+                    $deposito_liquido -= (float) $amount * $taxa_percent / 100;
+                } else {
+                    $amount = $data['preco'] / 100;
+                    $taxa_percent = $pm->$vezes;
+                    $taxa = (float) $amount * $taxa_percent / 100;
+                    $deposito_liquido = $amount - $taxa;
+                }
+
+                $pedido->valor_liquido = $deposito_liquido;
+                $pedido->taxa = $amount - $deposito_liquido;
+                $pedido->save();
+
+                $transaction = PagarmeTrait::requestPaymentCardPagarme($request, $payload);
+
+                $content = json_decode($transaction->content(), true);
+                if (isset($content['uuid'])) {
+                    $idTransaction = $content['uuid'];
+                    $transacaoUnica = TransactionIn::where('idTransaction', $idTransaction)->first();
+
+                    if ($transacaoUnica) {
+                        $status = $content['status'] ? 'revisao' : 'cancelado';
+                        self::_handleSplitLogic($transacaoUnica, $pedido, $data, $user, $status);
+                    }
+                }
+
+                return $transaction;
+            default:
+                return response()->json(['status' => false]);
+        }
+    }
+
+    protected static function paymentBillet($request, $data)
+    {
+        /* RECEBENDO affiliate_ref
+            AGORA SO TRATAR OS DADOS PARA PAGAMENTO DO AFILIADO
+        */
+
+        $user = Produto::where('id', $data['produto']['id'])->first()->user;
+        $request->user = $user;
+
+        $dados = [
+            'produto_id' => $data['produto']['id'],
+            'valor' => $data['preco'],
+            'bumps' => $data['bumps'],
+            'metodo' => "boleto",
+            'comprador' => $data['comprador'],
+            'pagamento' => ['metodo' => $data['pagamento']['metodo']]
+        ];
+
+        if (!empty($data['produto']['desconto'] && !empty($data['produto']['desconto_id']))) {
+            $cupom = Cupon::where('id', $data['produto']['desconto_id'])->first();
+            $cupom->increment('usage', 1);
+            if ($cupom) {
+                $dados['cupon_code'] = $cupom->codigo;
+                $dados['cupon_desconto'] = $cupom->desconto;
+
+                $data['preco'] = $dados['valor'];
+            }
+        }
+
+        $pedido = Pedido::create($dados);
+
+        $adquirencia = Setting::first()->adquirencia_billet;
+        switch ($adquirencia) {
+            case 'efi':
+                $custom_id = Str::uuid()->toString();
+
+                $payload = [
+                    "items" => [
+                        [
+                            "name" => $data['produto']['name'],
+                            "value" => $data['preco'] * 100,
+                            "amount" => 1
+                        ]
+                    ],
+                    "payment" => [
+                        "banking_billet" => [
+                            "customer" => [
+                                "name" => $data['comprador']['name'],
+                                "cpf" => str_replace(['.', '-'], '', $data['comprador']['cpf']),
+                                "email" => $data['comprador']['email'],
+                                "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['comprador']['phone'])
+                            ],
+                            "expire_at" => Carbon::now()->addDays(15)->format('Y-m-d')
+                        ]
+                    ],
+                    "metadata" => [
+                        "custom_id" => $custom_id,
+                        "notification_url" => url('api/efi/callback/billet')
+                    ]
+                ];
+
+                $efi = Efi::first();
+
+                $amount = $data['preco'];
+                $taxa_percent = $efi->billet_tx_percent;
+                $taxa_fixed = $efi->billet_tx_fixed;
+                $deposito_liquido = $amount - $taxa_fixed;
+                $deposito_liquido -= (float) $amount * $taxa_percent / 100;
+
+                $pedido->valor_liquido = $deposito_liquido;
+                $pedido->taxa = $amount - $deposito_liquido;
+                $pedido->save();
+
+                $transaction = EfiTrait::requestPaymentBillet($request, $payload);
+
+                $content = json_decode($transaction->content(), true);
+                //dd($content);
+                if ($content['status'] && isset($content['uuid'])) {
+                    $idTransaction = $content['uuid'];
+                    $transacaoUnica = TransactionIn::where('idTransaction', $idTransaction)->first();
+
+                    if ($transacaoUnica) {
+                        // Para boletos, o status inicial é sempre pendente
+                        self::_handleSplitLogic($transacaoUnica, $pedido, $data, $user, 'pendente');
+                    }
+                }
+
+                return $transaction;
+            case 'pagarme':
+                $payload = [
+                    "items" => [
+                        [
+                            "name" => $data['produto']['name'],
+                            "value" => $data['preco'] * 100,
+                            "amount" => 1
+                        ]
+                    ],
+                    'description' => 'Pgto. ' . $pedido->produto->name,
+                    'customer' => $data['comprador'],
+                    "payment" => [
+                        "banking_billet" => [
+                            "customer" => [
+                                "name" => $data['comprador']['name'],
+                                "cpf" => str_replace(['.', '-'], '', $data['comprador']['cpf']),
+                                "email" => $data['comprador']['email'],
+                                "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['comprador']['phone'])
+                            ],
+                            "expire_at" => Carbon::now()->addDays(15)->format('Y-m-d')
+                        ]
+                    ]
+
+                ];
+
+                $setting = Setting::first();
+                $amount = (float) $pedido->valor;
+                $taxa_percent = $setting->billet_taxa_percent;
+                $taxa_fixed = $setting->billet_taxa_fixed;
+                $deposito_liquido = $amount - $taxa_fixed;
+                $deposito_liquido -= (float) $amount * $taxa_percent / 100;
+
+                $pedido->valor_liquido = $deposito_liquido;
+                $pedido->taxa = $amount - $deposito_liquido;
+                $pedido->save();
+
+                $transaction = PagarmeTrait::requestPaymentBilletPagarme($request, $payload);
+
+                $content = json_decode($transaction->content(), true);
+                if (isset($content['uuid'])) {
+                    $idTransaction = $content['uuid'];
+                    $transacaoUnica = TransactionIn::where('idTransaction', $idTransaction)->first();
+
+                    if ($transacaoUnica) {
+                        self::_handleSplitLogic($transacaoUnica, $pedido, $data, $user, 'pendente');
+                    }
+                }
+
+                return $transaction;
+            default:
+                return response()->json(['status' => false]);
+        }
+    }
+
+    public function verificarCupom(Request $request)
+    {
+        $codigo = $request->cupom;
+        $produto_id = $request->produto_id;
+
+        $ip = $request->header('X-Forwarded-For')
+            ?? $request->header('CF-Connecting-IP')
+            ?? $request->ip();
+
+        $lockKey = "verificar_cupom_lock_{$ip}";
+        $attemptsKey = "verificar_cupom_attempts_{$ip}";
+
+        // Se já estiver bloqueado
+        if (Cache::has($lockKey)) {
+            Log::debug("[VERIFICARCUPOM BLOQUEADO] IP={$ip}");
+            return response()->json([
+                'status' => false,
+                'message' => 'Várias consultas consecutivas. Aguarde 1 minuto e tente novamente.'
+            ], 429);
+        }
+
+        // Incrementa tentativas
+        $attempts = Cache::get($attemptsKey, 0) + 1;
+        Cache::put($attemptsKey, $attempts, now()->addSeconds(60));
+
+        if ($attempts >= 3) {
+            Cache::put($lockKey, true, now()->addSeconds(60));
+            Cache::forget($attemptsKey);
+
+            Log::debug("[VERIFICARCUPOM BLOQUEIO ATIVADO] IP={$ip}");
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Excesso de tentativas. Aguarde 1 minuto e tente novamente.'
+            ], 429);
+        }
+
+        $cupom = Cupon::where('codigo', $codigo)
+            ->where('produto_id', $produto_id)
+            ->first();
+
+        if (!$cupom) {
+            return response()->json(['status' => false, 'message' => 'Cupom não encontrado.'], 404);
+        }
+
+        $now = Carbon::now();
+
+        if ($now->between($cupom->data_inicio, $cupom->data_termino)) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Cupom válido. Aproveite a oferta.',
+                'data' => [
+                    'desconto_id' => $cupom->id,
+                    'desconto' => $cupom->desconto,
+                    'desconto_bumps' => $cupom->aplicar_orderbumps,
+                    'desconto_type' => $cupom->type,
+                ]
+            ]);
+        }
+
+        return response()->json(['status' => false, 'message' => 'Cupom fora do intervalo.']);
+
+    }
+
+    public function upsell(Request $request)
+    {
+        $data = $request->all();
+        $pedido = Pedido::where('uuid', $data['order'])->first();
+        $produto = Produto::where('uuid', $data['produto'])->first();
+
+        $request->user = $produto->user;
+
+        $payload = [
+            "preco" => $produto->price,
+            "produto" => $produto,
+            "bumps" => [],
+            "comprador" => $pedido['comprador'],
+            "pagamento" => $data['pagamento'] ?? $pedido['pagamento']
+        ];
+
+        return $this->paymentCard($request, $payload);
+    }
+
+    public function adDefault(Request $request)
+    {
+        $adquirencia = Setting::first()->adquirencia_card;
+        $pedido = Pedido::where('uuid', $request->order)->first();
+
+        $payload = ['adquirencia' => $adquirencia, 'document' => $pedido->comprador['cpf'], 'order' => base64_encode(json_encode($pedido->pagamento))];
+        if ($adquirencia == 'efi') {
+            $identificador_conta = Efi::first()->identificador_conta;
+            $payload['identificador_conta'] = $identificador_conta;
+        }
+        return response()->json($payload);
+    }
+
+
+    public static function orderStripe(Request $request)
+    {
+        $data = $request->all();
+        /* RECEBENDO affiliate_ref
+            AGORA SO TRATAR OS DADOS PARA PAGAMENTO DO AFILIADO
+        */
+
+        $user = Produto::where('id', $data['produto']['id'])->first()->user;
+        $request->user = $user;
+
+        $dados = [
+            'produto_id' => $data['produto']['id'],
+            'valor' => $data['preco'],
+            'bumps' => $data['bumps'],
+            'metodo' => "cartao",
+            'comprador' => $data['comprador'],
+            'pagamento' => $data['pagamento']
+        ];
+
+        if (!empty($data['produto']['desconto'] && !empty($data['produto']['desconto_id']))) {
+            $cupom = Cupon::where('id', $data['produto']['desconto_id'])->first();
+            $cupom->increment('usage', 1);
+            if ($cupom) {
+                $desconto = (float) $data['preco'] * (float) $cupom->desconto / 100;
+                $dados['valor'] = (float) $dados['valor'] - $desconto;
+                $dados['cupon_code'] = $cupom->codigo;
+                $dados['cupon_desconto'] = $cupom->desconto;
+
+                $data['preco'] = $dados['valor'];
+            }
+        }
+
+        $idTransaction = Str::uuid()->toString();
+        $dados['status'] = $data['status'] == 'pago' ? 'revisao' : 'cancelado';
+        $dados['idTransaction'] = $idTransaction;
+
+        Pedido::create($dados);
+
+        $ip = $request->header('X-Forwarded-For') ?
+            $request->header('X-Forwarded-For') : ($request->header('CF-Connecting-IP') ?
+                $request->header('CF-Connecting-IP') :
+                $request->ip());
+
+        $stripe = Stripe::first();
+        $taxafixa = (float) $stripe->tx_card_fixed;
+        $taxapercent = (float) $data['preco'] * (float) $stripe->tx_card_percent / 100;
+
+        $deposito_liquido = (float) $data['preco'] - $taxafixa - $taxapercent;
+        $taxa_cash_in = $taxafixa + $taxapercent;
+
+        $cashin = [
+            "method" => "card",
+            "external_id" => $idTransaction,
+            "amount" => $data['preco'],
+            "client_name" => $data['comprador']['name'],
+            "client_cpf" => $data['comprador']['cpf'],
+            "client_email" => $data['comprador']['email'],
+            "status" => $dados['status'],
+            "idTransaction" => $idTransaction,
+            "cash_in_liquido" => $deposito_liquido,
+            "taxa_reserva" => 0,
+            "qrcode_pix" => "N/A",
+            "paymentcode" => "N/A",
+            "paymentCodeBase64" => "N/A",
+            "adquirente_ref" => 'stripe',
+            "taxa_cash_in" => $taxa_cash_in,
+            "executor_ordem" => 'stripe',
+            "request_ip" => $ip,
+            "request_domain" => $request->httpHost(),
+            "type" => 'cash',
+            "plataforma" => 'api',
+            "user_id" => $user->id,
+            "descricao_transacao" => $data['description'],
+            "callbackUrl" => 'checkout',
+        ];
+
+        TransactionIn::create($cashin);
+        return response()->json(['status' => true]);
+    }
+
+    /**
+     * Lida com a divisão de valores (split) para uma transação.
+     *
+     * @param \App\Models\TransactionIn $transacaoUnica A transação original do gateway.
+     * @param \App\Models\Pedido $pedido O pedido associado.
+     * @param array $data Os dados da requisição original.
+     * @param \App\Models\User $vendedor O usuário vendedor (produtor).
+     * @param string $status O status inicial para as transações de split.
+     * @return void
+     */
+    protected static function _handleSplitLogic(TransactionIn $transacaoUnica, Pedido $pedido, array $data, User $vendedor, string $status)
+    {
+        $setting = Setting::first();
+        $participantes = [];
+        $porcentagemTotalDistribuida = 0;
+
+        // Adiciona Afiliado, se houver
+        if (isset($data['affiliate_ref'])) {
+            $afiliado = Affiliate::where('ref', $data['affiliate_ref'])->first();
+            if ($afiliado) {
+                $porcentagem = (float) $afiliado->percentage;
+                $participantes['afiliado'] = [
+                    'user_id' => $afiliado->user_id,
+                    'user_name' => $afiliado->user->name,
+                    'porcentagem' => $porcentagem,
+                    'descricao' => 'AFILIADO'
+                ];
+                $porcentagemTotalDistribuida += $porcentagem;
+            }
+        }
+
+        // Adiciona Coprodutor, se houver
+        if ($pedido->produto->coproducao) {
+            $coproducao = $pedido->produto->coproducao;
+            $porcentagem = (float) $coproducao->percentage;
+            $participantes['coprodutor'] = [
+                'user_id' => $coproducao->user_id,
+                'user_name' => $coproducao->user->name,
+                'porcentagem' => $porcentagem,
+                'descricao' => 'COPRODUCAO'
+            ];
+            $porcentagemTotalDistribuida += $porcentagem;
+        }
+
+        // Vendedor fica com o restante
+        $porcentagemVendedor = 100 - $porcentagemTotalDistribuida;
+        $participantes['vendedor'] = [
+            'user_id' => $vendedor->id,
+            'user_name' => $vendedor->name,
+            'porcentagem' => $porcentagemVendedor,
+            'descricao' => 'VENDEDOR'
+        ];
+
+        // Itera e cria a transação de split para cada um
+        foreach ($participantes as $chave => $parte) {
+            $fatiaBruta = (float) bcmul($transacaoUnica->amount, ($parte['porcentagem'] / 100), 2);
+
+            $fatiaTaxa = 0;
+            $cashInLiquidoAntesReserva = 0;
+
+            if ($chave === 'vendedor') {
+                // A taxa TOTAL é aplicada SOMENTE ao vendedor
+                $fatiaTaxa = (float) $transacaoUnica->taxa_cash_in;
+                $cashInLiquidoAntesReserva = (float) bcsub($fatiaBruta, $fatiaTaxa, 2);
+            } else {
+                // Afiliados e coprodutores não pagam taxa
+                $fatiaTaxa = 0;
+                $cashInLiquidoAntesReserva = $fatiaBruta;
+            }
+
+            $payloadSplit = $transacaoUnica->toArray();
+            unset($payloadSplit['id']); // Remove o ID para criar um novo registro
+            $payloadSplit['type'] = 'split';
+            $payloadSplit['status'] = $status; // Status dinâmico (pendente, revisao, etc)
+            $payloadSplit['user_id'] = $parte['user_id'];
+            $payloadSplit['descricao_transacao'] = $parte['descricao'];
+            $payloadSplit['amount'] = $fatiaBruta;
+            $payloadSplit['taxa_cash_in'] = $fatiaTaxa;
+            $payloadSplit['cash_in_liquido'] = $cashInLiquidoAntesReserva;
+            $payloadSplit['taxa_reserva'] = 0;
+
+            if ($setting && $setting->taxa_reserva > 0) {
+                $reserva = (float) bcmul($cashInLiquidoAntesReserva, ($setting->taxa_reserva / 100), 2);
+                $payloadSplit['taxa_reserva'] = $reserva;
+                $payloadSplit['dias_liberar_reserva'] = $setting->dias_liberar_reserva;
+                $payloadSplit['taxa_reserva_resgatada'] = false;
+                $payloadSplit['cash_in_liquido'] = (float) bcsub($cashInLiquidoAntesReserva, $reserva, 2);
+            }
+
+            TransactionIn::create($payloadSplit);
+
+            if ($chave === 'afiliado') {
+                $pedido->afiliado = ['name' => $parte['user_name'], 'porcentage' => $parte['porcentagem'], 'comission' => $fatiaBruta];
+                AffiliateHistory::create(['amount' => $fatiaBruta, 'status' => $status, 'user_id' => $parte['user_id'], 'pedido_id' => $pedido->id]);
+            } elseif ($chave === 'coprodutor') {
+                $pedido->coprodutor = ['name' => $parte['user_name'], 'porcentage' => $parte['porcentagem'], 'comission' => $fatiaBruta];
+            } elseif ($chave === 'vendedor') {
+                $pedido->valor_liquido = $cashInLiquidoAntesReserva;
+                $pedido->taxa = $fatiaTaxa;
+            }
+        }
+
+        // Invalida a transação original
+        $transacaoUnica->delete();
+
+        $pedido->idTransaction = $transacaoUnica->idTransaction;
+        $pedido->save();
+    }
+}

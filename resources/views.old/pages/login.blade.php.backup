@@ -1,0 +1,500 @@
+@php
+    use App\Helpers\Helper;
+    $setting = Helper::settings();
+
+     $active = session('tipo_auth', null); 
+      $form = request()->query('form') ?? null;
+@endphp
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="{{ $setting->software_description }}">
+	<meta name="author" content="@thigasdev">
+    <link rel="icon" href="/storage/{{ $setting->favicon_light }}" />
+    <title>{{ $setting->software_name }} - Login</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLMDJc1b/T0EIVtA7bB0w0B0w0w0w0w0w0w0w0w0w0w0w0w0w0w0w0w0w0w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- PICK ONE OF THE STYLES BELOW -->
+    <!-- <link href="css/modern.css" rel="stylesheet"> -->
+    <!-- <link href="css/classic.css" rel="stylesheet"> -->
+    <!-- <link href="css/dark.css" rel="stylesheet"> -->
+    <!-- <link href="css/light.css" rel="stylesheet"> -->
+
+    <!-- BEGIN SETTINGS -->
+    <!-- You can remove this after picking a style -->
+    <style>
+        :root {
+            --gateway-primary-color: {{ $setting->software_color ?? '#008f39' }};
+            --gateway-background-color: {{ $setting->software_color_background }};
+            --gateway-sidebar-color: {{ $setting->software_color_sidebar }};
+            --gateway-text-color: {{ $setting->software_color_text }};
+            --gateway-primary-opacity: rgba(51, 51, 51, 0.322);
+        }
+
+        body {
+            opacity: 0;
+            background: var(--gateway-primary-color);
+            background: linear-gradient(135deg, var(--gateway-primary-color) 65%, var(--gateway-primary-color) 150%);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 1.5rem 0;
+            color: gray;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(65, 65, 65, 0.575);
+        }
+
+        .divider:not(:empty)::before {
+            margin-right: .75em;
+        }
+
+        .divider:not(:empty)::after {
+            margin-left: .75em;
+        }
+
+        .btn-primary,
+        .form-check-input:checked {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .nav {
+            --bs-nav-link-padding-x: 1rem;
+            --bs-nav-link-padding-x: 1rem;
+            --bs-nav-link-padding-y: 0.5rem;
+            --bs-nav-link-font-weight: ;
+            --bs-nav-link-color: var(--gateway-primary-color);
+            --bs-nav-link-hover-color: var(--gateway-primary-opacity);
+            --bs-nav-link-disabled-color: var(--bs-primary-opacity);
+        }
+
+        a {
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .bg-opacity {
+            position: relative;
+            margin-left: -60px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bg-opacity::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background-image: url('/storage/images/image_auth.png');
+            background-size: cover;
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        .bg-opacity img {
+            position: relative;
+            z-index: 1;
+        }
+
+        .swal2-popup {
+            background-color: var(--gateway-sidebar-color) !important;
+            color: var(--gateway-text-color) !important;
+        } 
+        .btn-outline-primary {
+            border-color: var(--gateway-primary-color) !important;
+            color: var(--gateway-primary-color) !important;
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--gateway-primary-color) !important;
+            color: white !important;
+
+        }
+    </style>
+    <script src="{{ asset('assets/js/settings.js') }}"></script>
+    <!-- END SETTINGS -->
+</head>
+<!-- SET YOUR THEME -->
+
+<body class="theme-green login-background">
+    <div class="splash active">
+        <div class="splash-icon"></div>
+    </div>
+
+    <main class="main h-100 w-100">
+        <div class="container h-100">
+            <div class="row h-100">
+                <div class="col-sm-10 col-md-8 col-lg-6 mx-auto d-table h-100">
+                    <div class="d-table-cell align-middle">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="m-sm-4">
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <div class="row w-100">
+                                            <div id="menuEscolha">
+                                                <div class="mb-3 col-12 w-100">
+                                                    <div class="text-center mb-4">
+                                                        <img src="/storage/{{ $setting->logo_light . '?ver=' . uniqid() }}"
+                                                            alt="SoftBank" width="auto" height="60px" />
+                                                    </div>
+                                                </div>
+                                                @error('banido')
+                                                    <div class="alert alert-warning px-3 py-2" role="alert">
+                                                       {{ $message }}
+                                                    </div>
+                                                @enderror
+                                                <div class="mb-3 col-12 w-100">
+                                                    <button id="btnSouAluno" class="btn btn-primary btn-lg w-100">Sou
+                                                        Aluno</button>
+                                                </div>
+                                                <div class="mb-3 divider">ou</div>
+                                                <div class="mb-3 col-12 w-100">
+                                                    <button id="btnSouProdutor" class="btn btn-primary btn-lg w-100">Sou
+                                                        Produtor</button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Bloco de login aluno -->
+                                            <div id="formAluno" class="d-none w-100 px-2">
+                                                <form action="{{ route('aluno.auth') }}" method="POST">
+                                                    @csrf
+                                                    <div class="mb-3 w-100" style="position: relative;">
+                                                        <div class="mb-3" style="cursor: pointer"
+                                                            onclick="backToHome()">
+                                                            <x-lucide-icon :icon="'arrow-left'" size="24"
+                                                                color="gray" />
+                                                        </div>
+
+                                                        <h1 class="fw-bold">Entrar</h1>
+                                                        <p>Precisa de uma <a href="#" id="btnRecPassAluno">Nova senha?</a></p>
+                                                        <div style="position: absolute;bottom:0px;right:0px">
+                                                            <img src="/storage/{{ $setting->favicon_light . '?ver=' . uniqid() }}"
+                                                                alt="SoftBank" width="60px" height="60px" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 w-100">
+                                                        <input type="email" class="form-control form-control-lg"
+                                                            name="email" placeholder="Email">
+                                                        @error('email')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <div class="mb-3 w-100">
+                                                        <div class="input-group js-toggle-password">
+                                                            <input type="password" 
+                                                                class="form-control form-control-lg"
+                                                                name="password" 
+                                                                placeholder="Senha"
+                                                                aria-label="Senha">
+                                                            
+                                                            <button class="btn btn-outline-primary js-toggle-btn" 
+                                                                    type="button" 
+                                                                    title="Mostrar Senha">
+                                                                <i class="fas fa-eye js-toggle-icon"></i> 
+                                                            </button>
+                                                        </div>
+
+                                                        @error('password')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <button type="submit"
+                                                        class="btn btn-primary btn-lg w-100">Entrar</button>
+                                                </form>
+                                            </div>
+
+                                            <!-- Bloco de login produtor -->
+                                            <div id="formProdutor" class="d-none w-100 px-2">
+                                                <div class="mb-3 w-100" style="position: relative;">
+                                                    <div class="mb-3" style="cursor: pointer" onclick="backToHome()">
+                                                        <x-lucide-icon :icon="'arrow-left'" size="24"
+                                                            color="gray" />
+                                                    </div>
+                                                    <h1 class="fw-bold">Entrar</h1>
+                                                    <p>Ainda não tem conta? <a href="/auth/jwt/register">Crie uma nova</a></p>
+                                                    <div style="position: absolute;bottom:0px;right:0px">
+                                                        <img src="/storage/{{ $setting->favicon_light . '?ver=' . uniqid() }}"
+                                                            alt="SoftBank" width="60px" height="60px" />
+                                                    </div>
+                                                </div>
+                                                
+                                                <form method="POST" action="{{ route('auth.login') }}">
+                                                    @csrf
+                                                    <div class="mb-3 w-100">
+                                                        <input type="email" name="email" class="form-control form-control-lg"
+                                                            placeholder="Email">
+                                                        @error('email')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <div class="mb-3 w-100">
+                                                        <div class="input-group js-toggle-password">
+                                                            <input type="password" 
+                                                                class="form-control form-control-lg"
+                                                                name="password" 
+                                                                placeholder="Senha"
+                                                                aria-label="Senha">
+                                                            
+                                                            <button class="btn btn-outline-primary js-toggle-btn" 
+                                                                    type="button" 
+                                                                    title="Mostrar Senha">
+                                                                <i class="fas fa-eye js-toggle-icon"></i> 
+                                                            </button>
+                                                        </div>
+                                                        @error('password')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <p class="my-2">Esqueci a senha <a href="#" id="btnRecPassProd">Recuperar?</a></p>
+                                                    <button type="submit"
+                                                        class="btn btn-primary btn-lg w-100">Entrar</button>
+
+                                                </form>
+                                            </div>
+
+
+                                            <!-- Bloco de recuperar senha aluno -->
+                                            <div id="formRecPassAluno" class="d-none w-100 px-2">
+                                                <form action="{{ route('aluno.newpass') }}" method="POST">
+                                                    @csrf
+                                                    <div class="mb-3 w-100" style="position: relative;">
+                                                        <div class="mb-3" style="cursor: pointer"
+                                                            onclick="document.getElementById('btnSouAluno').click()">
+                                                            <x-lucide-icon :icon="'arrow-left'" size="24"
+                                                                color="gray" />
+                                                        </div>
+
+                                                        <h1 class="fw-bold">Nova senha</h1>
+                                                        <p >Lembrei-me da senha! <a href="#" onclick="document.getElementById('btnSouAluno').click()">Acessar</a></p>
+                                                        <div style="position: absolute;bottom:0px;right:0px">
+                                                            <img src="/storage/{{ $setting->favicon_light . '?ver=' . uniqid() }}"
+                                                                alt="SoftBank" width="60px" height="60px" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 w-100">
+                                                        <input type="email" class="form-control form-control-lg"
+                                                            name="email" placeholder="Email">
+                                                        @error('email')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <button type="submit"
+                                                        class="btn btn-primary btn-lg w-100">Recuperar</button>
+                                                </form>
+                                            </div>
+
+                                            <!-- Bloco de recuperar senha produtor -->
+                                            <div id="formRecPassProd" class="d-none w-100 px-2">
+                                                <form action="{{ route('auth.recpass') }}" method="POST">
+                                                    @csrf
+                                                    <div class="mb-3 w-100" style="position: relative;">
+                                                        <div class="mb-3" style="cursor: pointer"
+                                                            onclick="document.getElementById('btnSouProdutor').click()">
+                                                            <x-lucide-icon :icon="'arrow-left'" size="24"
+                                                                color="gray" />
+                                                        </div>
+
+                                                        <h1 class="fw-bold">Recuperar senha</h1>
+                                                        <p >Lembrei-me da senha! <a href="#" onclick="document.getElementById('btnSouProdutor').click()">Acessar</a></p>
+                                                        <div style="position: absolute;bottom:0px;right:0px">
+                                                            <img src="/storage/{{ $setting->favicon_light . '?ver=' . uniqid() }}"
+                                                                alt="SoftBank" width="60px" height="60px" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3 w-100">
+                                                        <input type="email" class="form-control form-control-lg"
+                                                            name="email" placeholder="Email">
+                                                        @error('email')
+                                                            <div class="text-danger">{{ $message }}</div>
+                                                        @enderror
+                                                    </div>
+                                                    <button type="submit"
+                                                        class="btn btn-primary btn-lg w-100">Recuperar</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+      <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            let form = "{{ $form }}";
+            if(form && form === 'aluno'){
+                document.getElementById('btnSouAluno').click();
+            } else if(form && form === 'produtor'){
+                document.getElementById('btnSouProdutor').click();
+            } else if (form && form === 'new-password'){
+                document.getElementById('btnRecPassAluno').click();
+            }
+        })
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            let tipo = "{{ $active }}";
+            if(tipo && tipo === 'aluno'){
+                document.getElementById('btnSouAluno').click();
+            } else if(tipo && tipo === 'produtor'){
+                document.getElementById('btnSouProdutor').click();
+            } else if (tipo && tipo === 'new-password'){
+                document.getElementById('btnRecPassAluno').click();
+            }
+        })
+    </script>
+    <script>
+        
+        document.getElementById('btnRecPassAluno').addEventListener('click', function() {
+            document.getElementById('menuEscolha').classList.add('d-none');
+            document.getElementById('formAluno').classList.add('d-none');
+            document.getElementById('formProdutor').classList.add('d-none');
+            document.getElementById('formRecPassAluno').classList.remove('d-none');
+        });
+
+        document.getElementById('btnRecPassProd').addEventListener('click', function() {
+            document.getElementById('menuEscolha').classList.add('d-none');
+            document.getElementById('formAluno').classList.add('d-none');
+            document.getElementById('formProdutor').classList.add('d-none');
+            document.getElementById('formRecPassAluno').classList.add('d-none');
+            document.getElementById('formRecPassProd').classList.remove('d-none');
+        });
+
+        document.getElementById('btnSouAluno').addEventListener('click', function() {
+            document.getElementById('menuEscolha').classList.add('d-none');
+            document.getElementById('formAluno').classList.remove('d-none');
+            document.getElementById('formRecPassAluno').classList.add('d-none');
+            document.getElementById('formRecPassProd').classList.add('d-none');
+        });
+
+        document.getElementById('btnSouProdutor').addEventListener('click', function() {
+            document.getElementById('menuEscolha').classList.add('d-none');
+            document.getElementById('formAluno').classList.add('d-none');
+            document.getElementById('formProdutor').classList.remove('d-none');
+            document.getElementById('formRecPassAluno').classList.add('d-none');
+            document.getElementById('formRecPassProd').classList.add('d-none');
+        });
+
+        function backToHome() {
+            document.getElementById('menuEscolha').classList.remove('d-none');
+            document.getElementById('formAluno').classList.add('d-none');
+            document.getElementById('formProdutor').classList.add('d-none');
+            document.getElementById('formRecPassAluno').classList.add('d-none');
+            document.getElementById('formRecPassProd').classList.add('d-none');
+        }
+    </script>
+<script>
+
+        
+        // Define a função no escopo global
+        function showToast(type, message) {
+            Swal.mixin({
+                toast: true,
+                icon: type,
+                title: message,
+                animation: false,
+                position: 'top-right',
+                showConfirmButton: false,
+                showCloseButton: true,
+                timer: 5000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer)
+                    toast.addEventListener('mouseleave', Swal.resumeTimer)
+                }
+            }).fire(); // 🔥 Adiciona o .fire() para exibir o toast!
+        }
+
+        // Espera o DOM carregar antes de mostrar o toast
+        document.addEventListener("DOMContentLoaded", function () {
+            @if (session('success'))
+                showToast('success', "{{ session('success') }}");
+            @endif
+
+            @if (session('error'))
+                showToast('error', "{{ session('error') }}");
+            @endif
+
+            @if (session('info'))
+                showToast('info', "{{ session('info') }}");
+            @endif
+
+            @if (session('warning'))
+                showToast('warning', "{{ session('warning') }}");
+            @endif
+        });
+    </script>
+    <script src="{{ asset('assets/js/app.js') }}"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+  <!-- <script disable-devtool-auto src='https://cdn.jsdelivr.net/npm/disable-devtool@latest'></script> -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+    // Seleciona todos os grupos de input de senha
+    const toggleContainers = document.querySelectorAll('.js-toggle-password');
+    
+    toggleContainers.forEach(container => {
+        // Dentro de cada container, seleciona o input, o botão e o ícone
+        const passwordInput = container.querySelector('input[type="password"], input[type="text"]');
+        const toggleButton = container.querySelector('.js-toggle-btn');
+        const toggleIcon = container.querySelector('.js-toggle-icon');
+
+        // Garante que todos os elementos necessários foram encontrados
+        if (passwordInput && toggleButton && toggleIcon) {
+            
+            toggleButton.addEventListener('click', function () {
+                // 1. Alterna o atributo 'type' entre 'password' e 'text'
+                const currentType = passwordInput.getAttribute('type');
+                const newType = currentType === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', newType);
+                
+                // 2. Atualiza o ícone (Font Awesome)
+                if (newType === 'text') {
+                    // Mudar para o ícone de 'olho riscado' (esconder)
+                    toggleIcon.classList.remove('fa-eye');
+                    toggleIcon.classList.add('fa-eye-slash');
+                    toggleButton.setAttribute('title', 'Esconder Senha');
+                } else {
+                    // Mudar para o ícone de 'olho' (mostrar)
+                    toggleIcon.classList.remove('fa-eye-slash');
+                    toggleIcon.classList.add('fa-eye');
+                    toggleButton.setAttribute('title', 'Mostrar Senha');
+                }
+                
+                // 3. Mantém o foco no campo de senha
+                passwordInput.focus();
+            });
+        }
+    });
+});
+</script>
+<!--  <script disable-devtool-auto src="https://cdn.jsdelivr.net/npm/disable-devtool@latest"></script> -->
+</body>
+
+</html>

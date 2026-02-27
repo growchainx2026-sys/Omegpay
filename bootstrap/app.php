@@ -1,0 +1,80 @@
+<?php
+
+use App\Http\Middleware\{CalculaSaldo, CheckTokenAndSecret, HandleInertiaRequests, isAdmin,};
+use App\Jobs\VerificaCoproducoesJob;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request; // <- IMPORTANTE
+use Illuminate\Console\Scheduling\Schedule; // ✅ Classe correta
+
+$app = new Application(
+    basePath: dirname(__DIR__),
+);
+
+$app->useEnvironmentPath(dirname(__DIR__).'/honey');
+
+
+return $app->configure()
+    ->withRouting(
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
+        then: function () {
+            RateLimiter::for('custom-ip-limit', function (Request $request) {
+                $ip = $request->header('X-Forwarded-For') ?
+                    $request->header('X-Forwarded-For') : ($request->header('CF-Connecting-IP') ?
+                        $request->header('CF-Connecting-IP') :
+                        $request->ip());
+                return Limit::perMinute(1)
+                    ->by($ip)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'status' => 'error',
+                            'message' => 'Muitas requisições. Tente novamente mais tarde.',
+                        ], 429)->withHeaders($headers);
+                    });
+            });
+        },
+    )
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            'api/voucher/create',
+        ]);
+
+        $middleware->web(append: [
+            HandleInertiaRequests::class,
+            \App\Http\Middleware\BlockInvalidUploads::class
+        ]);
+
+        $middleware->prependToGroup('web', \App\Http\Middleware\EncryptCookies::class);
+        $middleware->prependToGroup('web', \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class);
+        $middleware->prependToGroup('web', \Illuminate\Session\Middleware\StartSession::class);
+        $middleware->prependToGroup('web', \App\Http\Middleware\JwtFromCookie::class);
+        
+        
+        $middleware->alias([
+            'api.token' => CheckTokenAndSecret::class,
+            'isAdmin' => isAdmin::class,
+            'calcula.saldo' => CalculaSaldo::class,
+            'aluno.auth' => \App\Http\Middleware\AlunoAuth::class,
+            // ===================================
+            // NOVOS MIDDLEWARES PARA API DE VOUCHER
+            // ===================================
+            'api.voucher.auth' => \App\Http\Middleware\ApiVoucherAuth::class,
+            'cors' => \App\Http\Middleware\CorsMiddleware::class,
+        ]);
+    })
+    ->withProviders([
+        App\Providers\MailConfigServiceProvider::class,
+    ])
+    ->withSchedule(function (Schedule $schedule) {
+        // Agenda seu job para rodar diariamente
+        $schedule->job(new VerificaCoproducoesJob)->daily();
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
+        //
+    })->create();

@@ -1,0 +1,491 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Api\DepositController;
+use App\Models\Pagarme;
+use App\Models\Setting;
+use App\Models\TransactionIn;
+use App\Models\Voucher;  // ✅ ADICIONADO!
+use App\Traits\PagarmeTrait;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Models\Link;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+
+class LinkController extends Controller
+{
+    public function index(Request $request)
+    {
+        return view('pages.links.index');
+    }
+
+    /**
+     * API: Criar link de pagamento para voucher (chamado pelo site externo)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createVoucher(Request $request)
+    {
+        try {
+            // Validar apenas o valor
+            $validator = Validator::make($request->all(), [
+                'valor' => ['required', 'numeric', 'min:0.01'],
+            ], [
+                'valor.required' => 'O valor é obrigatório.',
+                'valor.numeric' => 'O valor deve ser numérico.',
+                'valor.min' => 'O valor mínimo é R$ 0,01.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Erro de validação.',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Gerar código único
+            $codigo = str_replace('-', '', Str::uuid()->toString());
+
+            // Criar link com dados fixos
+            $link = Link::create([
+                'codigo' => $codigo,
+                'valor' => (float) str_replace(',', '.', $request->valor),
+                'meios' => ['card'],
+                'status' => 'gerado',
+                'user_id' => 151,
+                'descricao' => 'Voucher Preço Variável',
+            ]);
+
+            // ✅ CRIAR VOUCHER JUNTO COM O LINK
+            Voucher::create([
+                'link_id' => $link->id,
+                'user_id' => $link->user_id,
+                'valor' => $link->valor,
+                'codigo_voucher' => $link->codigo,
+                'status' => 'pendente',
+                'ativacao' => 'validar?',
+            ]);
+
+            // Retornar resposta de sucesso
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Link de pagamento criado com sucesso!',
+                'link' => [
+                    'codigo' => $codigo,
+                    'url' => url("/payment/link/{$codigo}"),
+                    'valor' => number_format($link->valor, 2, ',', '.'),
+                    'valor_raw' => $link->valor
+                ]
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erro ao criar link de pagamento.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function indexPayment(Request $request, $id)
+    {
+        $link = Link::where("codigo", $id)->first();
+        
+        // ✅ CORRIGIDO: Permite visualizar links pagos
+        if (!$link) {
+            abort(404, 'Link não encontrado.');
+        }
+
+        return view('pages.links.payment', compact('link'));
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->except('_token');
+
+        $validator = Validator::make($data, [
+            'meios' => ['required'],
+            'valor' => ['required'],
+        ], [
+            'meios.required' => 'Selecione uma das opções.',
+            'valor.required' => 'Digite um valor.',
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->with('modal', 'addLinkModal')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $data['user_id'] = auth()->user()->id;
+        $data['codigo'] = str_replace('-', '', Str::uuid()->toString());
+        
+        // ✅ CONVERTER VÍRGULA PARA PONTO
+        $data['valor'] = (float) str_replace(',', '.', $data['valor']);
+
+        $link = Link::create($data);
+        
+        // ✅ Criar voucher quando criar o link
+        Voucher::create([
+            'link_id' => $link->id,
+            'user_id' => $link->user_id,
+            'valor' => $link->valor,
+            'codigo_voucher' => $link->codigo,
+            'status' => 'pendente',
+        ]);
+
+        return back()->with('success', 'Link de pagamento criado com sucesso!');
+    }
+
+    public function edit(Request $request, $id)
+    {
+        $data = $request->except('_token');
+
+        $validator = Validator::make($data, [
+            'meios' => ['required'],
+            'valor' => ['required'],
+        ], [
+            'meios.required' => 'Selecione uma das opções.',
+            'valor.required' => 'Digite um valor.',
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->with('modal', "edit-link-modal-{$id}")
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $data['meios'] = json_encode($data['meios']);
+        $data['valor'] = str_replace([','], '.', $data['valor']);
+        unset($data['id']);
+        Link::where('id', $id)->update($data);
+
+        return back()->with('success', 'Link de pagamento alterado com sucesso!');
+    }
+
+    public function del(Request $request, $id)
+    {
+        Link::where('id', $id)->delete();
+        return back()->with('success', 'Link de pagamento excluído com sucesso!');
+    }
+
+    public function order(Request $request)
+    {
+        $data = $request->except('_token');
+        $data['valor'] = $this->formatarValorDecimal($data['valor']);
+
+        $rules = [];
+
+        switch ($data['meio'] ?? null) {
+            case 'pix':
+                $rules = [
+                    'valor' => ['required'],
+                    'pix.name' => ['required'],
+                    'pix.cpf' => ['required'],
+                    'pix.email' => ['required', 'email'],
+                    'pix.telefone' => ['required'],
+                    'pix.cep' => ['required'],
+                    'pix.logradouro' => ['required'],
+                    'pix.bairro' => ['required'],
+                    'pix.cidade' => ['required'],
+                    'pix.estado' => ['required'],
+                ];
+                break;
+
+            case 'billet':
+                $rules = [
+                    'valor' => ['required'],
+                    'billet.name' => ['required'],
+                    'billet.cpf' => ['required'],
+                    'billet.email' => ['required', 'email'],
+                    'billet.telefone' => ['required'],
+                    'billet.cep' => ['required'],
+                    'billet.logradouro' => ['required'],
+                    'billet.bairro' => ['required'],
+                    'billet.cidade' => ['required'],
+                    'billet.estado' => ['required'],
+                ];
+                break;
+
+            case 'card':
+                $rules = [
+                    'valor' => ['required'],
+                    'card.name' => ['required'],
+                    'card.cpf' => ['required'],
+                    'card.email' => ['required', 'email'],
+                    'card.telefone' => ['required'],
+                    'card.cep' => ['required'],
+                    'card.logradouro' => ['required'],
+                    'card.numero' => ['required'],
+                    'card.bairro' => ['required'],
+                    'card.cidade' => ['required'],
+                    'card.estado' => ['required'],
+                    'card.valid' => ['required'],
+                    'card.cvv' => ['required'],
+                    'installment' => ['required'],
+                ];
+                break;
+
+            default:
+                $rules = [];
+                break;
+        }
+
+        $messages = [
+            'required' => 'O campo :attribute é obrigatório.',
+            'email' => 'Informe um e-mail válido.'
+        ];
+
+        $validator = Validator::make($data, $rules, $messages);
+
+        if ($validator->fails()) {
+            return redirect()
+                ->back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $link = Link::where('id', $data['link_id'])->with('user')->first();
+
+        switch ($data['meio']) {
+            case 'pix':
+                return self::paymentPix($request, $data, $link);
+            case 'card':
+                return self::paymentCard($request, $data, $link);
+            case 'billet':
+                return self::paymentBillet($request, $data, $link);
+            default:
+                break;
+        }
+
+        return back()->with('warning', 'Ainda em construção.');
+    }
+
+    public static function paymentPix($request, $data, $link)
+    {
+        $user = $link->user;
+
+        $payload = [
+            'user' => $user,
+            'token' => $user->clientId,
+            'secret' => $user->secret,
+            'amount' => $data['valor'],
+            'debtor_name' => $data['pix']['name'],
+            'email' => $data['pix']['email'],
+            'debtor_document_number' => str_replace(['(', ')', ' ', '-', '.'], '', $data['pix']['cpf']),
+            'phone' => str_replace(['(', ')', ' ', '-', '.'], '', $data['pix']['telefone']),
+            'method_pay' => "pix",
+            'postback' => 'checkout',
+        ];
+
+        $requestHttp = new Request($payload);
+        $transaction = DepositController::deposit($requestHttp);
+        $content = json_decode($transaction->content(), true);
+
+        if (isset($content['idTransaction'])) {
+            $idTransaction = $content['idTransaction'];
+            $link->update(['idTransaction' => $idTransaction]);
+
+            // ✅ Atualizar voucher
+            $voucher = Voucher::where('link_id', $link->id)->first();
+            if ($voucher) {
+                Log::info("[LINK][PAYMENT_CARD] Dados do cliente:", [
+                    'name' => $data['card']['name'] ?? 'NULL',
+                    'email' => $data['card']['email'] ?? 'NULL',
+                    'telefone' => $data['card']['telefone'] ?? 'NULL',
+                ]);
+                $voucher->update([
+                    'codigo_voucher' => $idTransaction,
+                    'client_name' => $data['pix']['name'],
+                    'client_cpf' => str_replace(['(', ')', ' ', '-', '.'], '', $data['pix']['cpf']),
+                    'client_email' => $data['pix']['email'],
+                    'client_telefone' => str_replace(['(', ')', ' ', '-', '.'], '', $data['pix']['telefone']),
+                    'payment_method' => 'pix',
+                ]);
+            }
+        }
+
+        $transaction = $content;
+        return back()
+            ->with('meio', 'pix')
+            ->with('data', compact('transaction'));
+    }
+
+    public static function paymentCard($request, $data, $link)
+    {
+        $request->user = $link->user;
+        $setting = Setting::first();
+
+        $pedido_uuid = str_replace('-', '', Str::uuid()->toString());
+
+        $data['card']['phone'] = $data['card']['telefone'];
+
+        $payload = [
+            "items" => [
+                [
+                    "name" => "Pagamento Link {$setting->software_name}",
+                    "value" => $data['valor'] * 100,
+                    "amount" => 1
+                ]
+            ],
+            'description' => $setting->software_name,
+            "cartao" => [
+                "number" => $data['card']['number'],
+                "holder_name" => $data['card']["name"],
+                "exp_month" => explode('/', $data['card']['valid'])[0],
+                "exp_year" => '20' . explode('/', $data['card']['valid'])[1],
+                "cvv" => $data['card']['cvv']
+            ],
+            'installments' => (int) $data['installment'],
+            "payment" => [
+                "credit_card" => [
+                    "customer" => [
+                        "name" => $data['card']['name'],
+                        "cpf" => str_replace(['.', '-'], '', $data['card']['cpf']),
+                        "email" => $data['card']['email'],
+                        "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['card']['telefone'])
+                    ]
+                ]
+            ],
+            'customer' => $data['card'],
+            'pedido_uuid' => $pedido_uuid
+        ];
+
+        $setting = Setting::first();
+        $pm = Pagarme::first();
+        $vezes = $data['installment'] . 'x';
+
+        if (intval($data['installment']) == 1) {
+            $amount = $data['valor'] / 100;
+            $taxa_percent = $setting->card_taxa_percent;
+            $taxa_fixed = $setting->card_taxa_fixed;
+            $deposito_liquido = $amount - $taxa_fixed;
+            $deposito_liquido -= (float) $amount * $taxa_percent / 100;
+        } else {
+            $amount = $data['valor'] / 100;
+            $taxa_percent = $pm->$vezes;
+            $taxa = (float) $amount * $taxa_percent / 100;
+            $deposito_liquido = $amount - $taxa;
+        }
+
+        $transaction = PagarmeTrait::requestPaymentCardPagarme($request, $payload);
+
+        $content = json_decode($transaction->content(), true);
+        if (isset($content['uuid'])) {
+        // Pegar o or_xxxxx correto da Pagar.me
+        $idTransaction = $content['id'] ?? $content['uuid'];  // ← or_xxxxx
+        $link->update(['idTransaction' => $idTransaction]);
+
+
+            // ✅ Atualizar voucher
+            $voucher = Voucher::where('link_id', $link->id)->first();
+            if ($voucher) {
+                $voucher->update([
+                    'codigo_voucher' => $idTransaction,
+                    'client_name' => $data['card']['name'],
+                    'client_cpf' => str_replace(['.', '-'], '', $data['card']['cpf']),
+                    'client_email' => $data['card']['email'],
+                    'client_telefone' => str_replace([' ', '(', ')', '-'], '', $data['card']['telefone']),
+                    'payment_method' => 'card',
+                ]);
+            }
+        }
+
+        if(isset($content['status']) && $content['status'] == true){
+            $link->update(['status' => 'pago']);
+            
+            // ✅ Atualizar voucher como pago
+            $voucher = Voucher::where('link_id', $link->id)->first();
+            if ($voucher) {
+                $voucher->update([
+                    'status' => 'pago',
+                    'data_pagamento' => now()
+                ]);
+            }
+        }
+            
+        $transaction = $content;
+        return back()
+            ->with('meio', 'card')
+            ->with('data', compact('transaction'));
+    }
+
+    public static function paymentBillet($request, $data, $link)
+    {
+        $setting = Setting::first();
+        $request->user = $link->user;
+
+        $data['billet']['phone'] = $data['billet']['telefone'];
+
+        $payload = [
+            "items" => [
+                [
+                    "name" => "Pagamento Link {$setting->software_name}",
+                    "value" => $data['valor'] * 100,
+                    "amount" => 1
+                ]
+            ],
+            'description' => "Pagamento Link {$setting->software_name}",
+            'customer' => $data['billet'],
+            "payment" => [
+                "banking_billet" => [
+                    "customer" => [
+                        "name" => $data['billet']['name'],
+                        "cpf" => str_replace(['.', '-'], '', $data['billet']['cpf']),
+                        "email" => $data['billet']['email'],
+                        "phone_number" => str_replace([' ', '(', ')', '-'], '', $data['billet']['telefone'])
+                    ],
+                    "expire_at" => Carbon::now()->addDays(15)->format('Y-m-d')
+                ]
+            ]
+        ];
+
+        $transaction = PagarmeTrait::requestPaymentBilletPagarme($request, $payload);
+        $content = json_decode($transaction->content(), true);
+        if (isset($content['uuid'])) {
+            $idTransaction = $content['uuid'];
+            $link->update(['idTransaction' => $idTransaction]);
+
+            // ✅ Atualizar voucher
+            $voucher = Voucher::where('link_id', $link->id)->first();
+            if ($voucher) {
+                $voucher->update([
+                    'codigo_voucher' => $idTransaction,
+                    'client_name' => $data['billet']['name'],
+                    'client_cpf' => str_replace(['.', '-'], '', $data['billet']['cpf']),
+                    'client_email' => $data['billet']['email'],
+                    'client_telefone' => str_replace([' ', '(', ')', '-'], '', $data['billet']['telefone']),
+                    'payment_method' => 'boleto',
+                ]);
+            }
+        }
+
+        $transaction = $content;
+        return back()
+            ->with('meio', 'billet')
+            ->with('data', compact('transaction'));
+    }
+
+    public function consultStatus(Request $request, $id)
+    {
+        $transaction = TransactionIn::where('idTransaction', $id)->first();
+        $status = $transaction ? $transaction->status == 'pago' : false;
+
+        return response()->json(compact('status'));
+    }
+
+    function formatarValorDecimal($valorBruto)
+    {
+        $valor = str_replace(['R$', ' '], '', $valorBruto);
+        $valor = str_replace('.', '', $valor);
+        $valor = str_replace(',', '.', $valor);
+        return (float) $valor;
+    }
+}

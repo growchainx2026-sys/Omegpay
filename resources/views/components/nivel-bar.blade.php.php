@@ -1,0 +1,46 @@
+@php
+    $setting = \App\Helpers\Helper::settings();
+
+    $nivel_atual = auth()->user()->nivelAtual ?? null;
+    $min = ($nivel_atual && isset($nivel_atual->min)) ? $nivel_atual->min : 0;
+    $max = ($nivel_atual && isset($nivel_atual->max)) ? $nivel_atual->max : 1; // evita divisão por zero
+    $atual = auth()->user()->transactions_in->where('status', 'pago')->sum('cash_in_liquido');
+
+    // Cálculo da porcentagem entre min e max
+    $progresso = max(0, min(100, (($atual - $min) / ($max - $min)) * 100));
+    
+    // Verifica se a imagem existe no servidor
+    $imagemExiste = false;
+    if ($nivel_atual && isset($nivel_atual->image) && !empty($nivel_atual->image)) {
+        $caminhoImagem = public_path(str_replace('/storage/', 'storage/', $nivel_atual->image));
+        $imagemExiste = file_exists($caminhoImagem);
+    }
+@endphp
+<div class="nv-topbar" style="max-width: 400px;position: absolute;top: 16%;right: 200px;" >
+    <div class="d-flex align-items-center justify-content-between m-2 px-2">
+        <!-- Ícone e título -->
+        <div class="d-flex align-items-center gap-2">
+            @if($imagemExiste)
+                <img src="{{ $nivel_atual->image }}" alt="Nível" style="height: 25px; width: auto;">
+            @endif
+            <span class="fw-semibold" style="font-size: 12px;">{{ $nivel_atual->name ?? 'N/A' }}</span>
+        </div>
+        <div style="width: 100px" class="mx-2">
+            <div class="progress " style="width: 100%;height: 10px;">
+                <div class="progress-bar progress-bar-striped bg-success" role="progressbar"
+                    style="width: {{ $progresso }}%;" aria-valuenow="{{ $progresso }}" aria-valuemin="0"
+                    aria-valuemax="100">
+                </div>
+            </div>
+        </div>
+        <!-- Espaço flexível no meio -->
+        <div class="flex-grow-1 mx-2 border-bottom" style="opacity: 0.2;"></div>
+
+        <!-- Valores -->
+        <div class="d-flex align-items-center">
+            <span class="fw-bold me-1">{{ \App\Helpers\Helper::formatK($atual) }}</span>
+            <span class="text-muted">/ {{ \App\Helpers\Helper::formatK($max) }}</span>
+        </div>
+    </div>
+</div>
+

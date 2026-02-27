@@ -1,0 +1,55 @@
+@php
+    $setting = \App\Helpers\Helper::settings();
+
+    $nivel_atual = auth()->user()->nivelAtual ?? 0;
+    $min = $nivel_atual->min ?? 0;
+    $max = $nivel_atual->max ?? 1; // evita divisão por zero
+    $atual = auth()->user()->transactions_in->where('status', 'pago')->sum('cash_in_liquido');
+
+    // Cálculo da porcentagem entre min e max
+    $diferenca = $max - $min;
+    $progresso = $diferenca > 0 
+        ? max(0, min(100, (($atual - $min) / $diferenca) * 100))
+        : 0; // Se min == max, progresso é 0%
+
+
+    function formatK($value) {
+        // FIX: Verifica se $value é válido antes de usar fmod
+        if (!is_numeric($value) || $value == 0) {
+            return 'R$ 0,00';
+        }
+        
+        if ($value >= 1000000 && fmod($value, 1000000) === 0.0) {
+            return 'R$ ' . number_format($value / 1000000, 0, ',', '.') . 'M';
+        } elseif ($value >= 1000 && fmod($value, 1000) === 0.0) {
+            return 'R$ ' . number_format($value / 1000, 0, ',', '.') . 'k';
+        } else {
+            return 'R$ ' . number_format($value, 2, ',', '.');
+        }
+    }
+@endphp
+<div class="nv-topbar" style="max-width: 400px;position: absolute;top: 16%;right: 90px;" >
+    <div class="d-flex align-items-center justify-content-between m-2 px-2">
+        <!-- Ícone e título -->
+        <div class="d-flex align-items-center gap-2">
+            <img src="{{ $nivel_atual->image }}" alt="Nível" style="height: 25px; width: auto;">
+            <span class="fw-semibold" style="font-size: 12px;">{{ $nivel_atual->name }}</span>
+        </div>
+        <div style="width: 100px" class="mx-2">
+            <div class="progress " style="width: 100%;height: 10px;">
+                <div class="progress-bar progress-bar-striped bg-success" role="progressbar"
+                    style="width: {{ $progresso }}%;" aria-valuenow="{{ $progresso }}" aria-valuemin="0"
+                    aria-valuemax="100">
+                </div>
+            </div>
+        </div>
+        <!-- Espaço flexível no meio -->
+        <div class="flex-grow-1 mx-2 border-bottom" style="opacity: 0.2;"></div>
+
+        <!-- Valores -->
+        <div class="d-flex align-items-center">
+            <span class="fw-bold me-1">{{ formatK($atual) }}</span>
+            <span class="text-muted">/ {{ formatK($max) }}</span>
+        </div>
+    </div>
+</div>

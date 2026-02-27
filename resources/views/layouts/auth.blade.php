@@ -1,0 +1,219 @@
+@php
+use App\Helpers\Helper;
+    $setting = Helper::settings();
+@endphp
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="description" content="{{ $setting->software_description }}">
+	<meta name="author" content="@thigasdev">
+    <link rel="icon" href="/storage/{{ $setting->favicon_light }}"/>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> --> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script> --> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+	<script src="https://unpkg.com/lucide@latest"></script> --> -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=dashboard" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <title>{{ $setting->software_name }} - @yield('title', 'Registrar-me')<</title>
+
+	<style>
+        :root {
+            --gateway-primary-color: {{ $setting->software_color ?? '#008f39' }};
+            --gateway-background-color: {{ $setting->software_color_background }};
+            --gateway-sidebar-color: {{ $setting->software_color_sidebar }};
+            --gateway-text-color: {{ $setting->software_color_text }};
+            --gateway-primary-opacity:rgb(0, 104, 42);
+        }
+
+        html, body {
+            font-family: 'Inter', 'Open Sans';
+        overflow-y: hidden; /* ou overflow-y: hidden */
+        height: 100%;
+        }
+
+        
+
+		body {
+            background: var(--gateway-primary-color);
+            background: linear-gradient(135deg,	var(--gateway-primary-color) 0%, var(--gateway-primary-color) 100%);
+		}
+		.card,
+		input.form-control,
+        select,
+		placeholder {
+			background: var(--gateway-sidebar-color) !important;
+			color: var(--gateway-text-color) !important;
+		}
+
+        input.form-control::placeholder {
+			color: var(--gateway-text-color) !important;
+        }
+
+        input.form-control:-ms-input-placeholder { /* Internet Explorer 10–11 */
+			color: var(--gateway-text-color) !important;
+        }
+
+        input.form-control::-ms-input-placeholder { /* Microsoft Edge (antigo) */
+			color: var(--gateway-text-color) !important;
+        }
+
+        input.form-control::-webkit-input-placeholder { /* Chrome/Safari/Opera */
+			color: var(--gateway-text-color) !important;
+        }
+
+        input.form-control::-moz-placeholder { /* Firefox 19+ */
+			color: var(--gateway-text-color) !important;
+        }
+
+        input.form-control:-moz-placeholder { /* Firefox 4–18 */
+			color: var(--gateway-text-color) !important;
+        }
+
+
+		.form-control label {
+			color: var(--gateway-text-color) !important;
+		}
+
+		.page-content-fade .main {
+			animation: pageFadeIn 0.35s ease forwards;
+		}
+		@keyframes pageFadeIn {
+			from { opacity: 0; }
+			to { opacity: 1; }
+		}
+
+		.progress-bar {
+			background: var(--gateway-primary-color) !important;
+			background-color: var(--gateway-primary-color) !important;
+		}
+		
+		a,
+		.btn-primary,
+		.btn-link {
+			color: var(--gateway-primary-color) !important;
+		}
+		.form-check-input:checked {
+			color: white !important;
+		}
+        .btn-primary:hover {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+		text-primary {
+			color: var(--gateway-primary-color) !important;
+		}
+        .input-group .btn {
+            min-width: 40px;
+            max-width: 40px;
+            width:100%;
+        }
+        .icon-form {
+            background:var(--gateway-primary-color) !important;
+            border-color:var(--gateway-primary-color) !important;
+            border-radius: 8px !important;
+            box-shadow: 0px 0px 4px 2px var(--gateway-primary-color);
+            z-index: 100 !important;
+        }
+        .input-group .btn {
+            min-width: 40px;
+            max-width: 40px;
+            width:100%;
+        }
+        .card {
+			border-radius: 8px !important;
+		}
+
+
+        .step-container {
+        position: relative;
+        text-align: center;
+        transform: translateY(-43%);
+        }
+
+        .step-circle {
+        width: 80px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #fff;
+        /* border: 2px solid var(--gateway-primary-color); */
+        line-height: 30px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+        cursor: pointer; /* Added cursor pointer */
+        }
+
+        .step-line {
+        position: absolute;
+        top: 16px;
+        left: 50px;
+        width: calc(100% - 60px);
+        height: 2px;
+        background-color: var(--gateway-primary-color);
+        z-index: -1;
+        }
+
+        #multi-step-form{
+        overflow-x: hidden;
+        }
+            .is-invalid {
+            border-color: #dc3545 !important;
+        }
+        .step-circle.active {
+            font-weight: bold;
+            color: var(--gateway-primary-color) !important;
+        } 
+
+        .btn-primary {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+            color: white !important;
+        }
+        .btn-primary:hover {
+            background: var(--gateway-primary-color) !important;
+            border-color: var(--gateway-primary-color) !important;
+        }
+
+        .btn-outline-primary {
+            border-color: var(--gateway-primary-color) !important;
+            color: var(--gateway-primary-color) !important;
+        }
+
+        
+        
+	</style>
+	<script src="{{ asset('assets/js/settings.js') }}"></script> --> -->
+	<!-- END SETTINGS -->
+</head>
+<!-- SET YOUR THEME -->
+
+<body class="theme-blue login-background page-content-fade" >
+	<main class="main h-100 w-100">
+		<div class="container h-100">
+			@yield('content')
+		</div>
+	</main>
+
+	<svg width="0" height="0" style="position:absolute">
+		<defs>
+			<symbol viewBox="0 0 512 512" id="ion-ios-pulse-strong">
+				<path
+					d="M448 273.001c-21.27 0-39.296 13.999-45.596 32.999h-38.857l-28.361-85.417a15.999 15.999 0 0 0-15.183-10.956c-.112 0-.224 0-.335.004a15.997 15.997 0 0 0-15.049 11.588l-44.484 155.262-52.353-314.108C206.535 54.893 200.333 48 192 48s-13.693 5.776-15.525 13.135L115.496 306H16v31.999h112c7.348 0 13.75-5.003 15.525-12.134l45.368-182.177 51.324 307.94c1.229 7.377 7.397 11.92 14.864 12.344.308.018.614.028.919.028 7.097 0 13.406-3.701 15.381-10.594l49.744-173.617 15.689 47.252A16.001 16.001 0 0 0 352 337.999h51.108C409.973 355.999 427.477 369 448 369c26.511 0 48-22.492 48-49 0-26.509-21.489-46.999-48-46.999z">
+				</path>
+			</symbol>
+		</defs>
+	</svg>
+   
+       <!-- <script disable-devtool-auto src="https://cdn.jsdelivr.net/npm/disable-devtool@latest"></script> --> 
+	<script src="{{ asset('assets/js/app.js') }}"></script> --> -->
+</body>
+
+</html>

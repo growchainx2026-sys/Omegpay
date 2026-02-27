@@ -1,0 +1,154 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Carbon\CarbonPeriod;
+use Illuminate\Support\Facades\DB;
+use App\Models\Banner;
+
+class DashboardController extends Controller
+{
+    public function index(Request $request)
+    {
+        // Removi os caracteres invisíveis ( ) que estavam no seu código de exemplo.
+
+        if (auth()->user()->status === 'aguardando' || auth()->user()->status === 'analise') {
+            return redirect()->route('auth.enviar-docs');
+        } elseif (auth()->user()->permission === 'admin') {
+            return redirect()->route('admin.dashboard');
+        } else {
+            $periodo = $request->input('periodo', 'dia');
+            $periodoPersonalizado = $request->input('periodo_personalizado');
+            $user = auth()->user();
+
+            $transactionsInQuery = $user->transactions_in();
+            $transactionsOutQuery = $user->transactions_out();
+
+            // Inicializar datas
+            $from = null;
+            $to = null;
+
+            // Definir intervalo conforme o período
+            switch ($periodo) {
+                case 'dia':
+                    $from = Carbon::today();
+                    $to = Carbon::now();
+                    break;
+                case 'semana':
+                    $from = Carbon::now()->startOfWeek(Carbon::MONDAY); // Começar na Segunda-feira
+                    $to = Carbon::now();
+                    break;
+                case 'mes':
+                    $from = Carbon::now()->startOfMonth();
+                    $to = Carbon::now();
+                    break;
+
+                // ✅ NOVO CASO: PERÍODO PERSONALIZADO
+                case 'personalizado':
+                    if (!empty($periodoPersonalizado) && str_contains($periodoPersonalizado, ' - ')) {
+                        list($start, $end) = explode(' - ', $periodoPersonalizado);
+
+                        try {
+                            // Parsear as strings de data no formato DD/MM/YYYY
+                            $from = Carbon::createFromFormat('d/m/Y', trim($start))->startOfDay();
+                            $to = Carbon::createFromFormat('d/m/Y', trim($end))->endOfDay();
+                        } catch (\Exception $e) {
+                            // Se o parsing falhar, volta para o padrão 'dia' ou 'tudo'
+                            $periodo = 'dia';
+                            $from = Carbon::today();
+                            $to = Carbon::now();
+                        }
+                    } else {
+                        // Se 'personalizado' foi selecionado mas o campo de data está vazio/inválido, 
+                        // volta para o padrão 'dia' (ou 'tudo', dependendo da sua regra de negócio).
+                        $periodo = 'dia';
+                        $from = Carbon::today();
+                        $to = Carbon::now();
+                    }
+                    break;
+
+                case 'tudo':
+                default:
+                    $from = null;
+                    $to = null;
+                    break;
+            }
+
+            // Aplicar filtros por data se necessário
+            if ($from && $to) {
+                $transactionsInQuery = $transactionsInQuery->whereBetween('created_at', [$from, $to]);
+                $transactionsOutQuery = $transactionsOutQuery->whereBetween('created_at', [$from, $to]);
+            }
+
+            // Obter os registros agora (apenas uma vez)
+            $transactionsIn = $transactionsInQuery->get();
+            $transactionsOut = $transactionsOutQuery->get();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Lógica para o Gráfico de Linhas/Barras (Agrupamento por Dia)
+            |--------------------------------------------------------------------------
+            | NOTA: O código abaixo ainda usa a lógica de 7 dias fixos. Se você deseja
+            | que o gráfico reflita o período *selecionado* (personalizado, mês, etc.),
+            | o bloco abaixo deve ser ajustado para usar $from e $to.
+            */
+
+            // 1. Definir o período para o gráfico com base no filtro selecionado.
+            if ($from && $to && $periodo !== 'tudo') {
+                $startDate = $from->copy()->startOfDay();
+                $endDate = $to->copy()->endOfDay();
+            } else {
+                // Padrão: Últimos 7 dias (para o gráfico de linha/barra)
+                $startDate = Carbon::now()->subDays(6)->startOfDay();
+                $endDate = Carbon::now()->endOfDay();
+            }
+
+            $period = CarbonPeriod::create($startDate, $endDate);
+
+            // 2. Inicializar coleções de dias com zero
+            $valoresDepositos = collect();
+            $valoresSacados = collect();
+
+            foreach ($period as $date) {
+                $label = $date->format('d/m');
+                $valoresDepositos[$label] = 0;
+                $valoresSacados[$label] = 0;
+            }
+
+            // 3. Agrupar transações por data (Usando a coleção de transações já filtrada)
+            $agrupadosDepositos = $transactionsIn->where('status', 'pago')->groupBy(function ($item) {
+                return $item->created_at->format('d/m');
+            })->map->sum('amount');
+
+            $agrupadosSaques = $transactionsOut->where('status', 'pago')->groupBy(function ($item) {
+                return $item->created_at->format('d/m');
+            })->map->sum('amount');
+
+            // 4. Mesclar valores reais com os dias padrão
+            $valoresDepositos = $valoresDepositos->merge($agrupadosDepositos);
+            $valoresSacados = $valoresSacados->merge($agrupadosSaques);
+
+            // 5. Preparar dados finais
+            $dias = $valoresDepositos->keys()->toArray();
+            $valores = $valoresDepositos->values()->toArray();
+            $valoresSaque = $valoresSacados->values()->toArray();
+
+
+            $banners = Banner::where('status', 1)->get();
+
+            return view('pages.dashboard', [
+                'banners' => $banners,
+                'periodo' => $periodo,
+                'periodo_personalizado' => $periodoPersonalizado, // Passar para a view manter o valor no input
+                'dias' => $dias,
+                'valoresDepositos' => $valores,
+                'valoresSacados' => $valoresSaque,
+                'transactionsIn' => $transactionsIn,
+                'transactionsOut' => $transactionsOut,
+            ]);
+        }
+    }
+}
