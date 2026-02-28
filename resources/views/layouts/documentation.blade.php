@@ -806,6 +806,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.documentElement.style.setProperty('--gateway-opacity', rgbaColor);
 });
 </script>
+@include('partials.modal-z-index-fix')
 
 </body>
 </html>

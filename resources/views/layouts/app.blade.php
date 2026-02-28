@@ -2448,18 +2448,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", () => hljs.highlightAll());
     </script>
-    <script>
-        // Força qualquer modal Bootstrap a ser filho direto de <body>,
-        // evitando que fique preso em containers com z-index/transform errados.
-        document.addEventListener('DOMContentLoaded', function () {
-            document.body.addEventListener('show.bs.modal', function (event) {
-                var modal = event.target;
-                if (modal && modal.classList.contains('modal')) {
-                    document.body.appendChild(modal);
-                }
-            }, true);
-        });
-    </script>
+    @include('partials.modal-z-index-fix')
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/service-worker.js")

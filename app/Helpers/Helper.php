@@ -15,16 +15,23 @@ class Helper
     public static function logoUrl(?string $path = null): string
     {
         if (!empty($path)) {
-            return asset('storage/' . ltrim($path, '/'));
+            $fullPath = storage_path('app/public/' . ltrim($path, '/'));
+            if (file_exists($fullPath)) {
+                return asset('storage/' . ltrim($path, '/'));
+            }
         }
-        return asset('assets/images/logo_light.png');
+        // Placeholder quando o arquivo não existe
+        return 'data:image/svg+xml,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="180" height="40" viewBox="0 0 180 40"><rect width="180" height="40" fill="#2563eb"/><text x="90" y="26" fill="white" font-family="sans-serif" font-size="18" font-weight="600" text-anchor="middle">Omegpay</text></svg>');
     }
 
     /** URL do favicon (customizado ou padrão em assets/images) */
     public static function faviconUrl(?string $path = null): string
     {
         if (!empty($path)) {
-            return asset('storage/' . ltrim($path, '/'));
+            $fullPath = storage_path('app/public/' . ltrim($path, '/'));
+            if (file_exists($fullPath)) {
+                return asset('storage/' . ltrim($path, '/'));
+            }
         }
         return asset('assets/images/favicon_light.png');
     }
@@ -33,19 +40,19 @@ class Helper
     public static function loginBackgroundUrl(?string $path = null): string
     {
         if (!empty($path)) {
-            $url = asset('storage/' . ltrim($path, '/'));
             $fullPath = storage_path('app/public/' . ltrim($path, '/'));
             if (file_exists($fullPath)) {
+                $url = asset('storage/' . ltrim($path, '/'));
                 $url .= '?v=' . filemtime($fullPath);
+                return $url;
             }
-            return $url;
         }
         $defaultPath = public_path('assets/images/bg.webp');
-        $url = asset('assets/images/bg.webp');
         if (file_exists($defaultPath)) {
-            $url .= '?v=' . filemtime($defaultPath);
+            return asset('assets/images/bg.webp') . '?v=' . filemtime($defaultPath);
         }
-        return $url;
+        // Placeholder gradiente quando o arquivo não existe
+        return 'data:image/svg+xml,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="980" height="1200" viewBox="0 0 980 1200"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#0f172a"/><stop offset="100%" style="stop-color:#1e293b"/></linearGradient></defs><rect width="980" height="1200" fill="url(#g)"/></svg>');
     }
 
     public static function calculaSaldoLiquido($user_id)

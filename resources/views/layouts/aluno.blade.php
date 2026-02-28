@@ -1413,6 +1413,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.documentElement.style.setProperty('--gateway-opacity2', rgbaColor2);
 });
 </script>
+@include('partials.modal-z-index-fix')
 
 </body>
 </html>
