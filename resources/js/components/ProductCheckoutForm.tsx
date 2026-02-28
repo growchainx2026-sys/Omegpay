@@ -19,13 +19,14 @@ import {
   Image,
   Input,
   ButtonGroup,
+  Box,
+  Link,
 } from '@chakra-ui/react';
 import { ShoppingCart, CreditCard, LucideCheckCircle2, LucideCopy, LucideDownload } from 'lucide-react';
 import { Formik, Form, useFormikContext, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { BuyerForm } from './BuyerForm';
 import { ProductPaymentForm } from './ProductPaymentForm';
-import { OrderSummary } from './OrderSummary';
 import { useConfig } from '../stores/config';
 import { QRCode } from 'react-qrcode-logo';
 import { Helper } from '@/helpers/helpers';
@@ -34,6 +35,7 @@ import { CheckoutProvider } from '@stripe/react-stripe-js/checkout';
 import { loadStripe } from '@stripe/stripe-js';
 import { StripeWrapper } from './customs/StripeWrapper';
 import { StripeForm } from './customs/StripeForm';
+import { DepoimentoComponent } from './renderable-produto/DepoimentoComponent';
 
 interface BuyerFormValues {
   name: string;
@@ -339,7 +341,7 @@ const ShowBoleto = (data: any) => {
 };
 
 export function ProductCheckoutForm() {
-  const { template, setting, produto, getTotalPrice, selectedOrderBumps, fbq, stripe, affiliate_ref } = useConfig();
+  const { template, setting, produto, getTotalPrice, selectedOrderBumps, fbq, stripe, affiliate_ref, depoimentos } = useConfig();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [title, setTitle] = useState<string>('');
@@ -592,8 +594,106 @@ export function ProductCheckoutForm() {
   return (
     <StripeWrapper>
       <VStack spacing={6} align="stretch">
-        {/* Resumo do Pedido */}
-        <OrderSummary />
+        {/* Bloco Compra segura (igual ao checkout builder) */}
+        <Box position="relative" borderRadius="lg" overflow="hidden">
+          <Text
+            pos="absolute"
+            top={0}
+            left={0}
+            right={0}
+            h="45px"
+            textAlign="center"
+            pt={2}
+            borderTopRadius="lg"
+            fontSize="xl"
+            fontWeight="bold"
+            bg="green.500"
+            color="white"
+            zIndex={1}
+          >
+            Compra segura
+          </Text>
+          <Box pt={12} px={4} pb={4}>
+            <HStack spacing={4} mb={6} align="flex-start">
+              <Image
+                bg="white"
+                borderRadius="lg"
+                src={Helper.storageUrl(produto?.image) || '/product-placeholder.svg'}
+                alt={produto?.name || 'Produto'}
+                boxSize="60px"
+                objectFit="cover"
+              />
+              <Box flex={1}>
+                <Text fontWeight="bold" color={template?.text_primary || 'gray.800'}>
+                  {produto?.name || 'Carregando...'}
+                </Text>
+                <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
+                  Precisa de ajuda?
+                </Text>
+                <Link fontSize="sm" color={template?.text_secondary || 'gray.500'} href="#">
+                  Veja o contato do vendedor
+                </Link>
+              </Box>
+            </HStack>
+
+            <Box py={6} borderY="1px" borderColor="gray.200">
+              <Text fontWeight="bold" mb={2}>
+                Total
+              </Text>
+              <Text fontSize="xl" fontWeight="bold" color={template?.text_active || 'green.600'} mb={1}>
+                1 X de {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'}
+              </Text>
+              <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
+                ou {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'} à vista
+              </Text>
+              <Text fontSize="sm" color={template?.text_secondary || 'gray.500'} mt={2}>
+                Renovação atual
+              </Text>
+            </Box>
+
+            <Box mt={6}>
+              {Helper.storageUrl(setting?.favicon_light) && (
+                <Image
+                  src={Helper.storageUrl(setting?.favicon_light)}
+                  alt={setting?.software_name}
+                  height="20px"
+                  mb={4}
+                />
+              )}
+              <Text fontSize="xs" color={template?.text_secondary || 'gray.500'} mb={2}>
+                {setting?.software_name} é uma instituição de pagamento para o comércio eletrônico regulada pelo Banco Central do Brasil e protegida pela{' '}
+                <Link color={template?.text_secondary || 'gray.500'} href="#">
+                  Política de privacidade
+                </Link>{' '}
+                e{' '}
+                <Link color={template?.text_secondary || 'gray.500'} href="#">
+                  Termos de serviço
+                </Link>
+                .
+              </Text>
+              <Text fontSize="xs" color={template?.text_secondary || 'gray.500'}>
+                Para reclamações sobre serviços financeiros, você também pode entrar em contato com os{' '}
+                <Link color={template?.text_secondary || 'gray.500'} href="#">
+                  Termos de Compra
+                </Link>
+                .
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Depoimentos do checkout (configurados no personalizador) */}
+        {(depoimentos || []).length > 0 && (
+          <VStack spacing={4} w="100%" align="stretch" mt={4}>
+            {(depoimentos || []).map((depoimento) => (
+              <DepoimentoComponent
+                key={depoimento?.id}
+                component={depoimento}
+                handleComponentClick={() => {}}
+              />
+            ))}
+          </VStack>
+        )}
 
         <Divider />
 
