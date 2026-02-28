@@ -4,9 +4,9 @@
 
 <style>
 /* Estilos para Modais - Design Minimalista e Intuitivo */
-/* Garantir que modais sejam renderizados no body, não dentro de containers */
+/* z-index alto (10060+) para ficar acima do backdrop e sidebar/drawer */
 .modal {
-    z-index: 9999 !important;
+    z-index: 10060 !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -17,7 +17,7 @@
 
 .modal-backdrop {
     background-color: rgba(0, 0, 0, 0.4) !important;
-    z-index: 9998 !important;
+    z-index: 10050 !important;
     opacity: 1 !important;
     position: fixed !important;
     top: 0 !important;
@@ -45,7 +45,7 @@ body.dark-mode .modal-backdrop {
 .modal-dialog {
     margin: 1.75rem auto;
     max-width: 600px;
-    z-index: 10000 !important;
+    z-index: 10061 !important;
     position: relative !important;
 }
 
@@ -56,7 +56,7 @@ body.dark-mode .modal-backdrop {
     background: #ffffff;
     position: relative !important;
     overflow: visible !important;
-    z-index: 10001 !important;
+    z-index: 10062 !important;
 }
 
 body.dark-mode .modal-content {
