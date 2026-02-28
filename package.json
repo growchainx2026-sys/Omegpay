@@ -18,6 +18,8 @@
         "vite": "^6.2.4"
     },
     "dependencies": {
+        "@stripe/react-stripe-js": "^3.4.0",
+        "@stripe/stripe-js": "^5.4.0",
         "@chakra-ui/icons": "^2.2.4",
         "@chakra-ui/react": "^2.8.2",
         "@dnd-kit/core": "^6.3.1",
