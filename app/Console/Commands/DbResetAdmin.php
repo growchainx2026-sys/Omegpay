@@ -34,9 +34,9 @@ class DbResetAdmin extends Command
      */
     public function handle(): int
     {
-        $this->info('=== GT-Pag: Reset DB + Admin ===');
+        $this->info('=== Omegpay: Reset DB + Admin ===');
 
-        $email = $this->option('email') ?: $this->ask('Email do admin', 'admin@gtpag.com');
+        $email = $this->option('email') ?: $this->ask('Email do admin', 'admin@omegpay.com');
         $password = $this->option('password') ?: $this->ask('Senha do admin (mín. 8 caracteres)', 'admin123');
 
         if (strlen($password) < 8) {
@@ -55,7 +55,7 @@ class DbResetAdmin extends Command
             // Garantir que existe um Setting (usado em todo o app)
             if (! Setting::first()) {
                 Setting::create([
-                    'software_name' => 'GT-Pag',
+                    'software_name' => 'Omegpay',
                     'software_description' => 'Plataforma de pagamentos',
                     'adquirente_default' => 'efi',
                     'taxa_cash_in' => 5,
