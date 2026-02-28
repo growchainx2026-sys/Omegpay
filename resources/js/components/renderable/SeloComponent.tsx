@@ -8,7 +8,7 @@ export const SeloComponent = ({ component, handleComponentClick }: { component: 
         <HStack
             onClick={() => handleComponentClick(component)}
             w={'100%'}
-            justifyContent={component?.align.includes("center") ? "center" : `${component?.align}`}
+            justifyContent={component?.align?.includes?.("center") ? "center" : (component?.align || "center")}
             borderRadius="md"
             p={4}
             bg="transparent"

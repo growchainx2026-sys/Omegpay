@@ -214,7 +214,7 @@ export function ProductPaymentForm({ onSubmit, isSubmitting }: ProductPaymentFor
           {({ meta }: any) => (
             <FormControl isInvalid={meta.error && meta.touched} w={'100%'}>
               <Grid templateColumns="repeat(12, 1fr)" mb={4} gap={4} w={'100%'}>
-                {produto?.methods?.includes('pix') && (
+                {(produto?.methods ?? []).includes('pix') && (
                   <GridItem colSpan={4}>
                     <Button
                       w="100%"
@@ -232,7 +232,7 @@ export function ProductPaymentForm({ onSubmit, isSubmitting }: ProductPaymentFor
                     </Button>
                   </GridItem>
                 )}
-                {produto?.methods?.includes('boleto') && (
+                {(produto?.methods ?? []).includes('boleto') && (
                   <GridItem colSpan={4}>
                     <Button
                       w="100%"
@@ -250,7 +250,7 @@ export function ProductPaymentForm({ onSubmit, isSubmitting }: ProductPaymentFor
                     </Button>
                   </GridItem>
                 )}
-                {produto?.methods?.includes('cartao') && (
+                {(produto?.methods ?? []).includes('cartao') && (
                   <GridItem colSpan={4}>
                     <Button
                       w="100%"

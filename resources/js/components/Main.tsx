@@ -1066,7 +1066,7 @@ export function Main({ isDraggingComponent, setIsDraggingComponent, onLayoutDrag
                     >
                       {/* Renderizar a Grid com base no layout */}
                       <Grid
-                        templateColumns={ device === 'mobile' && row?.layout?.includes('2') || device === 'mobile' && row?.layout?.includes('3') ? '1fr' : row.layout || '1fr'}
+                        templateColumns={ device === 'mobile' && (row?.layout ?? '')?.includes?.('2') || device === 'mobile' && (row?.layout ?? '')?.includes?.('3') ? '1fr' : row?.layout || '1fr'}
                         gap={0}
                         p={1}
                         px={0}

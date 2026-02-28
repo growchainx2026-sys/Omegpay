@@ -166,9 +166,9 @@ export default function ProductPage({ setting, produto, checkout, vendedor, utmf
             <ProductMain />
           </GridItem>
 
-          <GridItem
-            overflowX={'hidden'} colSpan={{ base: 12, xl: 7 }} p={{ base: 0, xl: 2 }} py={0} mx={{ base: 2, xl: 0 }} ml={{ base: '-3px', xl: 0 }}>
-            <ChakraBox p={{ base: 0, xl: 6 }} borderRadius="lg" boxShadow="sm" bg={checkout?.template.bg_form_payment}>
+          {/* Área de checkout: form à esquerda + Compra segura à direita (igual ao checkout-builder) */}
+          <GridItem colSpan={12} overflowX={'hidden'} p={{ base: 0, xl: 2 }} py={0}>
+            <ChakraBox borderRadius="lg" boxShadow="sm" bg={checkout?.template.bg_form_payment} p={{ base: 4, md: 6 }}>
               <ProductCheckoutForm />
             </ChakraBox>
           </GridItem>

@@ -21,6 +21,8 @@ import {
   ButtonGroup,
   Box,
   Link,
+  Grid,
+  GridItem,
 } from '@chakra-ui/react';
 import { ShoppingCart, CreditCard, LucideCheckCircle2, LucideCopy, LucideDownload } from 'lucide-react';
 import { Formik, Form, useFormikContext, FormikHelpers } from 'formik';
@@ -593,154 +595,180 @@ export function ProductCheckoutForm() {
 
   return (
     <StripeWrapper>
-      <VStack spacing={6} align="stretch">
-        {/* Bloco Compra segura (igual ao checkout builder) */}
-        <Box position="relative" borderRadius="lg" overflow="hidden">
-          <Text
-            pos="absolute"
-            top={0}
-            left={0}
-            right={0}
-            h="45px"
-            textAlign="center"
-            pt={2}
-            borderTopRadius="lg"
-            fontSize="xl"
-            fontWeight="bold"
-            bg="green.500"
-            color="white"
-            zIndex={1}
-          >
-            Compra segura
-          </Text>
-          <Box pt={12} px={4} pb={4}>
-            <HStack spacing={4} mb={6} align="flex-start">
-              <Image
-                bg="white"
-                borderRadius="lg"
-                src={Helper.storageUrl(produto?.image) || '/product-placeholder.svg'}
-                alt={produto?.name || 'Produto'}
-                boxSize="60px"
-                objectFit="cover"
-              />
-              <Box flex={1}>
-                <Text fontWeight="bold" color={template?.text_primary || 'gray.800'}>
-                  {produto?.name || 'Carregando...'}
+      <Grid
+        templateColumns={{ base: '1fr', md: '1fr 480px' }}
+        gap={4}
+        align="start"
+      >
+        {/* Coluna esquerda: Formulário (igual ao checkout builder) */}
+        <GridItem>
+          <VStack spacing={6} align="stretch">
+            {/* Info do produto (resumo no topo do form) */}
+            <Box p={6} borderRadius="lg" mb={0}>
+              <HStack spacing={4} align="flex-start">
+                <Image
+                  bg="white"
+                  src={Helper.storageUrl(produto?.image) || '/product-placeholder.svg'}
+                  alt="Produto"
+                  boxSize="60px"
+                  borderRadius="lg"
+                  objectFit="cover"
+                />
+                <Box>
+                  <Text fontWeight="bold" color={template?.text_primary || 'gray.800'}>
+                    {produto?.name || 'Carregando...'}
+                  </Text>
+                  <Text color={template?.text_active || 'green.600'}>
+                    1 X de {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'}
+                  </Text>
+                  <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
+                    ou {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'} à vista
+                  </Text>
+                </Box>
+              </HStack>
+            </Box>
+
+            <Formik
+              initialValues={initialValues}
+              validationSchema={setting?.adquirencia_card === 'stripe' ? validationSchemaStripe : validationSchema}
+              validateOnChange
+              validateOnBlur
+              onSubmit={handleSubmit}
+            >
+              {({ values, setFieldValue, errors, touched }) => (
+                <Form>
+                  <VStack spacing={6} align="stretch">
+                    <BuyerForm
+                      onSubmit={(buyerData) => {
+                        setFieldValue('buyer', buyerData);
+                      }}
+                    />
+
+                    <Divider />
+
+                    <ProductPaymentForm
+                      onSubmit={(paymentData) => {
+                        setFieldValue('payment', paymentData);
+                      }}
+                      isSubmitting={isSubmitting}
+                    />
+                  </VStack>
+                </Form>
+              )}
+            </Formik>
+          </VStack>
+        </GridItem>
+
+        {/* Coluna direita: Bloco Compra segura (sticky, igual ao checkout builder) */}
+        <GridItem>
+          <Box position="sticky" top={8}>
+            <Box
+              bg={template?.bg_form_payment || 'white'}
+              p={6}
+              borderRadius="lg"
+            >
+              <HStack spacing={4} mb={6} align="flex-start" position="relative">
+                <Text
+                  pos="absolute"
+                  top={0}
+                  left={0}
+                  right={0}
+                  h="45px"
+                  textAlign="center"
+                  pt={2}
+                  borderTopRadius="lg"
+                  fontSize="xl"
+                  fontWeight="bold"
+                  m={-6}
+                  mb={6}
+                  bg="green.500"
+                  color="white"
+                >
+                  Compra segura
+                </Text>
+                <Image
+                  bg="white"
+                  borderRadius="lg"
+                  mt={10}
+                  src={Helper.storageUrl(produto?.image) || '/product-placeholder.svg'}
+                  alt={produto?.name || 'Produto'}
+                  boxSize="60px"
+                  objectFit="cover"
+                />
+                <Box flex={1} mt={10}>
+                  <Text fontWeight="bold" color={template?.text_primary || 'gray.800'}>
+                    {produto?.name || 'Carregando...'}
+                  </Text>
+                  <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
+                    Precisa de ajuda?
+                  </Text>
+                  <Link fontSize="sm" color={template?.text_secondary || 'gray.500'} href="#">
+                    Veja o contato do vendedor
+                  </Link>
+                </Box>
+              </HStack>
+
+              <Box py={6} borderY="1px" borderColor="gray.200">
+                <Text fontWeight="bold" mb={2}>Total</Text>
+                <Text fontSize="xl" fontWeight="bold" color={template?.text_active || 'green.600'} mb={1}>
+                  1 X de {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'}
                 </Text>
                 <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
-                  Precisa de ajuda?
+                  ou {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'} à vista
                 </Text>
-                <Link fontSize="sm" color={template?.text_secondary || 'gray.500'} href="#">
-                  Veja o contato do vendedor
-                </Link>
+                <Text fontSize="sm" color={template?.text_secondary || 'gray.500'} mt={2}>
+                  Renovação atual
+                </Text>
               </Box>
-            </HStack>
 
-            <Box py={6} borderY="1px" borderColor="gray.200">
-              <Text fontWeight="bold" mb={2}>
-                Total
-              </Text>
-              <Text fontSize="xl" fontWeight="bold" color={template?.text_active || 'green.600'} mb={1}>
-                1 X de {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'}
-              </Text>
-              <Text fontSize="sm" color={template?.text_secondary || 'gray.500'}>
-                ou {produto ? Helper.formatPrice(produto?.price) : 'R$ 0,00'} à vista
-              </Text>
-              <Text fontSize="sm" color={template?.text_secondary || 'gray.500'} mt={2}>
-                Renovação atual
-              </Text>
+              <Box mt={6}>
+                {Helper.storageUrl(setting?.favicon_light) && (
+                  <Image
+                    src={Helper.storageUrl(setting?.favicon_light)}
+                    alt={setting?.software_name}
+                    height="20px"
+                    mb={4}
+                  />
+                )}
+                <Text fontSize="xs" color={template?.text_secondary || 'gray.500'} mb={2}>
+                  {setting?.software_name} é uma instituição de pagamento para o comércio eletrônico regulada pelo Banco Central do Brasil e protegida pela{' '}
+                  <Link color={template?.text_secondary || 'gray.500'} href="#">Política de privacidade</Link>{' '}
+                  e{' '}
+                  <Link color={template?.text_secondary || 'gray.500'} href="#">Termos de serviço</Link>.
+                </Text>
+                <Text fontSize="xs" color={template?.text_secondary || 'gray.500'}>
+                  Para reclamações sobre serviços financeiros, você também pode entrar em contato com os{' '}
+                  <Link color={template?.text_secondary || 'gray.500'} href="#">Termos de Compra</Link>.
+                </Text>
+              </Box>
             </Box>
 
-            <Box mt={6}>
-              {Helper.storageUrl(setting?.favicon_light) && (
-                <Image
-                  src={Helper.storageUrl(setting?.favicon_light)}
-                  alt={setting?.software_name}
-                  height="20px"
-                  mb={4}
-                />
-              )}
-              <Text fontSize="xs" color={template?.text_secondary || 'gray.500'} mb={2}>
-                {setting?.software_name} é uma instituição de pagamento para o comércio eletrônico regulada pelo Banco Central do Brasil e protegida pela{' '}
-                <Link color={template?.text_secondary || 'gray.500'} href="#">
-                  Política de privacidade
-                </Link>{' '}
-                e{' '}
-                <Link color={template?.text_secondary || 'gray.500'} href="#">
-                  Termos de serviço
-                </Link>
-                .
-              </Text>
-              <Text fontSize="xs" color={template?.text_secondary || 'gray.500'}>
-                Para reclamações sobre serviços financeiros, você também pode entrar em contato com os{' '}
-                <Link color={template?.text_secondary || 'gray.500'} href="#">
-                  Termos de Compra
-                </Link>
-                .
-              </Text>
-            </Box>
-          </Box>
-        </Box>
-
-        {/* Depoimentos do checkout (configurados no personalizador) */}
-        {(depoimentos || []).length > 0 && (
-          <VStack spacing={4} w="100%" align="stretch" mt={4}>
-            {(depoimentos || []).map((depoimento) => (
-              <DepoimentoComponent
-                key={depoimento?.id}
-                component={depoimento}
-                handleComponentClick={() => {}}
-              />
-            ))}
-          </VStack>
-        )}
-
-        <Divider />
-
-        <Formik
-          initialValues={initialValues}
-          validationSchema={setting?.adquirencia_card === 'stripe' ? validationSchemaStripe : validationSchema}
-          validateOnChange
-          validateOnBlur
-          onSubmit={handleSubmit}
-        >
-          {({ values, setFieldValue, errors, touched }) => (
-            <Form>
-              <VStack spacing={6} align="stretch">
-                {/* Dados do Comprador */}
-                <BuyerForm
-                  onSubmit={(buyerData) => {
-                    setFieldValue('buyer', buyerData);
-                  }}
-                />
-
-                <Divider />
-
-
-                <ProductPaymentForm
-                  onSubmit={(paymentData) => {
-                    setFieldValue('payment', paymentData);
-                  }}
-                  isSubmitting={isSubmitting}
-                />
-                {/* Dados de Pagamento */}
-
+            {/* Depoimentos do checkout (configurados no personalizador) */}
+            {(depoimentos || []).length > 0 && (
+              <VStack spacing={4} w="100%" align="stretch" mt={4} borderRadius="lg">
+                {(depoimentos || []).map((depoimento) => (
+                  <DepoimentoComponent
+                    key={depoimento?.id}
+                    component={depoimento}
+                    handleComponentClick={() => {}}
+                  />
+                ))}
               </VStack>
-            </Form>
-          )}
-        </Formik>
+            )}
+          </Box>
+        </GridItem>
+      </Grid>
 
-        <Modal onClose={onClose} isOpen={isOpen} isCentered >
-          <ModalOverlay />
-          <ModalContent mx={{ base: 4, lg: undefined }}>
-            <ModalHeader textAlign={'center'}>{title}</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody mb={10}>
-              {content}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
-      </VStack>
+      <Modal onClose={onClose} isOpen={isOpen} isCentered>
+        <ModalOverlay />
+        <ModalContent mx={{ base: 4, lg: undefined }}>
+          <ModalHeader textAlign="center">{title}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody mb={10}>
+            {content}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </StripeWrapper>
   );
 }

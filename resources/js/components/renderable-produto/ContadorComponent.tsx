@@ -13,7 +13,7 @@ export const ContadorComponent = ({ component, handleComponentClick }: { compone
          let targetTime: Date
         
         // Se time é um timestamp (string de data)
-        if (typeof component.time === 'string' && component.time.includes('T')) {
+        if (typeof component?.time === 'string' && component.time.includes('T')) {
             targetTime = new Date(component.time)
             
             // Se o timestamp está no passado, criar um timestamp futuro para demonstração
@@ -22,8 +22,8 @@ export const ContadorComponent = ({ component, handleComponentClick }: { compone
             }
         } 
         // Se time é um número (segundos)
-        else if (typeof component.time === 'string' || !isNaN(Number(component.time))) {
-            let dth = component.time.split(':');
+        else if (typeof component?.time === 'string' || !isNaN(Number(component?.time))) {
+            let dth = String(component?.time ?? '').split(':');
             let segundos = 0;
             if (dth.length === 3) {
                 segundos = Number(dth[0]) * 60 * 60 + Number(dth[1]) * 60 + Number(dth[2]);

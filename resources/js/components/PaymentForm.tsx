@@ -51,7 +51,7 @@ export function PaymentForm({
       </HStack>
 
       <Grid templateColumns="repeat(12, 1fr)" mb={4} gap={4} w={'100%'}>
-        {produto?.methods?.includes('pix') && (
+        {(produto?.methods ?? []).includes('pix') && (
           <GridItem colSpan={4} w={'100%'}>
             <Button
               bg={metodo === 'pix' ? template.btn_selected_bg_color : template.btn_unselected_bg_color}
@@ -77,7 +77,7 @@ export function PaymentForm({
           </GridItem>
         )}
 
-        {produto?.methods?.includes('boleto') && (
+        {(produto?.methods ?? []).includes('boleto') && (
           <GridItem colSpan={4} w={'100%'}>
             <Button
               bg={metodo === 'boleto' ? template.btn_selected_bg_color : template.btn_unselected_bg_color}
@@ -103,7 +103,7 @@ export function PaymentForm({
           </GridItem>
         )}
 
-        {produto?.methods?.includes('credit_card') && (
+        {(produto?.methods ?? []).includes('credit_card') && (
           <GridItem colSpan={4} w={'100%'}>
             <Button
               bg={metodo === 'cartao' ? template.btn_selected_bg_color : template.btn_unselected_bg_color}

@@ -49,7 +49,7 @@ export default function CheckoutOffer({metodo, onSubmit, isSubmitting}:{ metodo:
     <VStack spacing={6} align="stretch" my={8}>
       {/* ORDER BUMPS */}
       {produto?.bumps?.map((orderBump: OrderBump) => {
-        const isSelected = selectedOrderBumps.includes(`${orderBump?.id}`);
+        const isSelected = (selectedOrderBumps ?? []).includes(`${orderBump?.id}`);
         return (
           <Box 
             key={orderBump.id}
