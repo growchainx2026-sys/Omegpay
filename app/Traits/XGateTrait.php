@@ -11,7 +11,10 @@ use App\Helpers\Helper;
 
 trait XGateTrait
 {
-    protected const XGATE_BASE_URL = 'https://api.xgateglobal.com';
+    protected static function getXGateBaseUrl(): string
+    {
+        return 'https://api.xgateglobal.com';
+    }
 
     protected static function getXGateCredentials(): ?XGate
     {
@@ -24,7 +27,7 @@ trait XGateTrait
 
     protected static function getXGateToken(XGate $xgate): ?string
     {
-        $response = Http::post(self::XGATE_BASE_URL . '/auth/token', [
+        $response = Http::post(self::getXGateBaseUrl() . '/auth/token', [
             'email' => $xgate->email,
             'password' => $xgate->password,
         ]);
@@ -40,11 +43,11 @@ trait XGateTrait
     protected static function getXGateBrlCurrency(string $token): ?array
     {
         $response = Http::withToken($token)
-            ->get(self::XGATE_BASE_URL . '/deposit/company/currencies');
+            ->get(self::getXGateBaseUrl() . '/deposit/company/currencies');
 
         if (!$response->successful()) {
             $response2 = Http::withToken($token)
-                ->get(self::XGATE_BASE_URL . '/withdraw/company/currencies');
+                ->get(self::getXGateBaseUrl() . '/withdraw/company/currencies');
             if ($response2->successful()) {
                 $currencies = $response2->json();
                 if (is_array($currencies)) {
@@ -101,7 +104,7 @@ trait XGateTrait
         ];
 
         $createCustomer = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/customer', array_filter($customerPayload));
+            ->post(self::getXGateBaseUrl() . '/customer', array_filter($customerPayload));
 
         if (!$createCustomer->successful()) {
             Log::error('[XGATE][DEPOSIT] Falha ao criar cliente: ' . $createCustomer->body());
@@ -137,7 +140,7 @@ trait XGateTrait
         ];
 
         $depositResponse = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/deposit', $depositPayload);
+            ->post(self::getXGateBaseUrl() . '/deposit', $depositPayload);
 
         Log::debug('[XGATE][DEPOSIT] Request deposit | Response: ' . $depositResponse->status() . ' ' . $depositResponse->body());
 
@@ -288,7 +291,7 @@ trait XGateTrait
         ];
 
         $createCustomer = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/customer', array_filter($customerPayload));
+            ->post(self::getXGateBaseUrl() . '/customer', array_filter($customerPayload));
 
         if (!$createCustomer->successful()) {
             Log::error('[XGATE][WITHDRAW] Falha ao criar cliente: ' . $createCustomer->body());
@@ -311,11 +314,11 @@ trait XGateTrait
 
         $pixKeyPayload = ['key' => $pixKey, 'type' => $pixKeyType];
         $createPixKey = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/pix/customer/' . $customerId . '/key', $pixKeyPayload);
+            ->post(self::getXGateBaseUrl() . '/pix/customer/' . $customerId . '/key', $pixKeyPayload);
 
         if (!$createPixKey->successful()) {
             $keysResponse = Http::withToken($token)
-                ->get(self::XGATE_BASE_URL . '/pix/customer/' . $customerId . '/key');
+                ->get(self::getXGateBaseUrl() . '/pix/customer/' . $customerId . '/key');
             $pixKeyObj = null;
             if ($keysResponse->successful()) {
                 $keys = $keysResponse->json();
@@ -362,7 +365,7 @@ trait XGateTrait
         ];
 
         $withdrawResponse = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/withdraw', $withdrawPayload);
+            ->post(self::getXGateBaseUrl() . '/withdraw', $withdrawPayload);
 
         Log::debug('[XGATE][WITHDRAW] Request withdraw | Response: ' . $withdrawResponse->status() . ' ' . $withdrawResponse->body());
 
@@ -516,7 +519,7 @@ trait XGateTrait
         ];
 
         $createCustomer = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/customer', $customerPayload);
+            ->post(self::getXGateBaseUrl() . '/customer', $customerPayload);
 
         if (!$createCustomer->successful()) {
             return back()->with('error', 'Erro ao criar cliente: ' . ($createCustomer->json('message') ?? $createCustomer->body()));
@@ -529,7 +532,7 @@ trait XGateTrait
 
         $pixKeyPayload = ['key' => $pixKey, 'type' => $pixKeyType];
         $createPixKey = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/pix/customer/' . $customerId . '/key', $pixKeyPayload);
+            ->post(self::getXGateBaseUrl() . '/pix/customer/' . $customerId . '/key', $pixKeyPayload);
 
         $pixKeyObj = null;
         if ($createPixKey->successful()) {
@@ -539,7 +542,7 @@ trait XGateTrait
             }
         } else {
             $keysResponse = Http::withToken($token)
-                ->get(self::XGATE_BASE_URL . '/pix/customer/' . $customerId . '/key');
+                ->get(self::getXGateBaseUrl() . '/pix/customer/' . $customerId . '/key');
             if ($keysResponse->successful()) {
                 $keys = $keysResponse->json();
                 $dataKeys = is_array($keys) ? ($keys['data'] ?? $keys) : [];
@@ -571,7 +574,7 @@ trait XGateTrait
         ];
 
         $withdrawResponse = Http::withToken($token)
-            ->post(self::XGATE_BASE_URL . '/withdraw', $withdrawPayload);
+            ->post(self::getXGateBaseUrl() . '/withdraw', $withdrawPayload);
 
         if ($withdrawResponse->successful() || $withdrawResponse->status() === 202) {
             $responseData = $withdrawResponse->json();
