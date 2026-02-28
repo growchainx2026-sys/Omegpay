@@ -109,14 +109,14 @@ type Status = "waiting_payment" | "paid" | "refunded";
   const storageUrl = (path: string | undefined | null): string | undefined => {
     if (path == null || path === "" || String(path) === "undefined") return undefined;
     const s = String(path);
-    // Preserva data: URLs e URLs absolutas (não passar por /storage/)
-    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/")) {
-      return s;
-    }
-    // box_default.png/svg pode não existir no storage — evita 404
+    // Preserva data: URLs e URLs absolutas
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://")) return s;
+    // box_default pode não existir no storage — evita 404
     if (s.includes("box_default")) return undefined;
     const trimmed = s.replace(/^\/+/, "");
-    return trimmed ? `/storage/${trimmed}` : undefined;
+    if (!trimmed) return undefined;
+    // Paths como /images/xxx (salvos pelo admin) precisam de /storage/ para servir corretamente
+    return trimmed.startsWith("storage/") ? `/${trimmed}` : `/storage/${trimmed}`;
   };
 
   export const Helper = {

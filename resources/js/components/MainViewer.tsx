@@ -3,6 +3,7 @@ import {
   Image as ChakraImage,
   Link
 } from '@chakra-ui/react'
+import { Helper } from '@/helpers/helpers'
 import { TextComponent } from './renderable/TextComponent'
 import { ImageComponent } from './renderable/ImageComponent'
 import { VantagemComponent } from './renderable/VantagemComponent'
@@ -17,7 +18,7 @@ import { UserDataForm } from './UserDataForm'
 import { PaymentForm } from './PaymentForm'
 
 export function MainViewer() {
-  const { checkoutData, template, device } = useConfig()
+  const { checkoutData, template, device, setting } = useConfig()
   
   // Obter rows do layout do checkoutData
   const rows = checkoutData?.layout?.rows || []
@@ -200,9 +201,11 @@ export function MainViewer() {
                 />
 
                 <Box mt={6}>
-                  <ChakraImage src="/favicon.png" alt="Gokto" height="20px" mb={4} />
+                  {Helper.storageUrl(setting?.favicon_light) && (
+                    <ChakraImage src={Helper.storageUrl(setting?.favicon_light)} alt={setting?.software_name || 'Logo'} height="20px" mb={4} />
+                  )}
                   <Text fontSize="xs" color={template.text_secondary} mb={2}>
-                    Space é uma instituição de pagamento para o comércio eletrônico regulada pelo Banco Central do Brasil e protegida pela
+                    {setting?.software_name || 'Plataforma'} é uma instituição de pagamento para o comércio eletrônico regulada pelo Banco Central do Brasil e protegida pela
                     <Link color={template.text_secondary} href="#"> Política de privacidade </Link>
                     e
                     <Link color={template.text_secondary} href="#"> Termos de serviço</Link>.
