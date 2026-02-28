@@ -1,24 +1,24 @@
-{{-- Fix global: modais Bootstrap sempre acima do backdrop (tela preta) - aplica a TODOS os modais --}}
+{{-- Fix global: modais Bootstrap SEMPRE acima do backdrop - modal vem NA FRENTE --}}
 <style>
-    /* Z-index: modal SEMPRE acima do backdrop - valores altos para sobrepor sidebar/drawer */
+    /* Backdrop ABAIXO, modal ACIMA - ordem garantida */
     .modal-backdrop { z-index: 10050 !important; }
-    .modal { z-index: 10060 !important; }
-    .modal-dialog { z-index: 10061 !important; position: relative; }
-    .modal-content { z-index: 10062 !important; position: relative; }
-    /* SweetAlert2 */
-    .swal2-container { z-index: 10065 !important; }
+    .modal { z-index: 10100 !important; }
+    .modal.show { z-index: 10100 !important; }
+    .modal-dialog { z-index: 1 !important; position: relative; }
+    .modal-content { z-index: 2 !important; position: relative; }
+    .swal2-container { z-index: 10150 !important; }
 </style>
 <script>
 (function() {
     'use strict';
-    var BASE_BACKDROP = 10050, BASE_MODAL = 10060;
+    var BACKDROP_Z = 10050, MODAL_Z = 10100;
 
     function fixModalZIndex() {
         var backdrops = document.querySelectorAll('.modal-backdrop');
         var modals = document.querySelectorAll('.modal.show');
-        backdrops.forEach(function(b, i) { b.style.zIndex = (BASE_BACKDROP + i * 10).toString(); });
-        modals.forEach(function(modal, i) {
-            modal.style.zIndex = (BASE_MODAL + i * 10).toString();
+        backdrops.forEach(function(b) { b.style.zIndex = BACKDROP_Z.toString(); });
+        modals.forEach(function(modal) {
+            modal.style.zIndex = MODAL_Z.toString();
             var d = modal.querySelector('.modal-dialog');
             var c = modal.querySelector('.modal-content');
             if (d) d.style.zIndex = '1';

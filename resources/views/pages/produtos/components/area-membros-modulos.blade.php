@@ -3,10 +3,9 @@
 @endphp
 
 <style>
-/* Estilos para Modais - Design Minimalista e Intuitivo */
-/* z-index alto (10060+) para ficar acima do backdrop e sidebar/drawer */
+/* Estilos para Modais - modal SEMPRE acima do backdrop (10050) */
 .modal {
-    z-index: 10060 !important;
+    z-index: 10100 !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
@@ -45,7 +44,7 @@ body.dark-mode .modal-backdrop {
 .modal-dialog {
     margin: 1.75rem auto;
     max-width: 600px;
-    z-index: 10061 !important;
+    z-index: 1 !important;
     position: relative !important;
 }
 
@@ -56,7 +55,7 @@ body.dark-mode .modal-backdrop {
     background: #ffffff;
     position: relative !important;
     overflow: visible !important;
-    z-index: 10062 !important;
+    z-index: 2 !important;
 }
 
 body.dark-mode .modal-content {
