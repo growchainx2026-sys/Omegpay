@@ -1946,88 +1946,30 @@ document.getElementById('editModuloModal')?.addEventListener('hidden.bs.modal', 
     document.getElementById('editModuloForm')?.reset();
 });
 
-// Garantir que modais funcionem corretamente e sejam renderizados no body
+// Garantir z-index dos modais - usa valores do fix global (10060+) para ficar acima do backdrop
 document.addEventListener('DOMContentLoaded', function() {
-    // Move todos os modais para o body para garantir z-index correto
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        if (modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
-        }
-        // Garante z-index alto e position fixed
-        modal.style.zIndex = '9999';
-        modal.style.position = 'fixed';
-    });
-    
-    // Remove backdrops duplicados se existirem
-    const backdrops = document.querySelectorAll('.modal-backdrop');
-    if (backdrops.length > 1) {
-        backdrops.forEach((backdrop, index) => {
-            if (index > 0) backdrop.remove();
+    var BASE_MODAL = 10060;
+    function fixModalsZIndex() {
+        document.querySelectorAll('.modal.show').forEach(function(modal, i) {
+            modal.style.zIndex = (BASE_MODAL + i * 10).toString();
+            modal.style.position = 'fixed';
+            var dialog = modal.querySelector('.modal-dialog');
+            var content = modal.querySelector('.modal-content');
+            if (dialog) dialog.style.zIndex = '1';
+            if (content) content.style.zIndex = '2';
+        });
+        document.querySelectorAll('.modal-backdrop').forEach(function(b, i) {
+            b.style.zIndex = (10050 + i * 10).toString();
         });
     }
-    
-    // Garantir que modais sejam fecháveis ao clicar no backdrop
-    document.querySelectorAll('.modal').forEach(modal => {
+    document.querySelectorAll('.modal').forEach(function(modal) {
+        if (modal.parentElement !== document.body) document.body.appendChild(modal);
         modal.addEventListener('show.bs.modal', function() {
-            // Garante que modal está no body
-            if (modal.parentElement !== document.body) {
-                document.body.appendChild(modal);
-            }
-            modal.style.zIndex = '9999';
-            modal.style.position = 'fixed';
-            
-            // Remove qualquer backdrop existente antes de abrir novo modal
-            const existingBackdrops = document.querySelectorAll('.modal-backdrop');
-            existingBackdrops.forEach(b => b.remove());
-        });
-        
-        modal.addEventListener('shown.bs.modal', function() {
-            // Garante z-index após mostrar
-            modal.style.zIndex = '9999';
-            modal.style.position = 'fixed';
-            const dialog = modal.querySelector('.modal-dialog');
-            if (dialog) {
-                dialog.style.zIndex = '10000';
-                dialog.style.position = 'relative';
-            }
-            const content = modal.querySelector('.modal-content');
-            if (content) {
-                content.style.zIndex = '10001';
-                content.style.position = 'relative';
-            }
-        });
-        
-        modal.addEventListener('hidden.bs.modal', function() {
-            // Remove backdrop ao fechar
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach(b => b.remove());
-            // Remove classe do body
-            document.body.classList.remove('modal-open');
-            document.body.style.overflow = '';
-            document.body.style.paddingRight = '';
-        });
+            if (modal.parentElement !== document.body) document.body.appendChild(modal);
+        }, { once: false });
+        modal.addEventListener('shown.bs.modal', fixModalsZIndex, { once: false });
     });
-    
-    // Observer para modais adicionados dinamicamente
-    const modalObserver = new MutationObserver(function(mutations) {
-        mutations.forEach(function(mutation) {
-            mutation.addedNodes.forEach(function(node) {
-                if (node.nodeType === 1 && node.classList && node.classList.contains('modal')) {
-                    if (node.parentElement !== document.body) {
-                        document.body.appendChild(node);
-                    }
-                    node.style.zIndex = '9999';
-                    node.style.position = 'fixed';
-                }
-            });
-        });
-    });
-    
-    modalObserver.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    document.body.addEventListener('shown.bs.modal', fixModalsZIndex, true);
 });
 </script>
 

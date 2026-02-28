@@ -319,19 +319,30 @@ class TransactionsController extends Controller
                 $response = ['data' => ['status' => 'error', 'message' => 'Erro inesperado'], 'status' => 500];
                 break;
         }
-        //dd($response);
-        $qrcode = $response['data']['qrcode'];
-        $qrimage = $response['data']['qr_code_image_url'];
+
+        if (empty($response) || !is_array($response)) {
+            return back()->with('error', 'Resposta inválida do sistema de pagamento.')->withInput();
+        }
+
+        $dataResp = $response['data'] ?? [];
+        $statusResp = $dataResp['status'] ?? null;
+        $qrcode = $dataResp['qrcode'] ?? null;
+        $qrimage = $dataResp['qr_code_image_url'] ?? null;
+
+        if ($statusResp === 'error' || empty($qrcode)) {
+            $errorMsg = $dataResp['message'] ?? 'Erro ao gerar QR Code. Verifique sua configuração de pagamento (adquirente PIX).';
+            return back()->with('error', $errorMsg)->withInput();
+        }
+
         $amount = "R$ " . number_format($data['amount'], 2, ',', '.');
         $success = "QrCode gerado com sucesso.";
-
 
         return back()->with([
             'qrcode' => $qrcode,
             'qr_code_image_url' => $qrimage,
             'amount' => $amount,
             'success' => $success
-        ])->withInput(); // Isso limpará a sessão após a primeira exibição
+        ])->withInput();
     }
 
     public function transferirSaldo(Request $request)
