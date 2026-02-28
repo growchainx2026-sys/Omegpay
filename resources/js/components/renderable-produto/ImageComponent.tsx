@@ -8,7 +8,7 @@ const PLACEHOLDER = '/product-placeholder.svg';
 export const ImageComponent = (props: any) => {
     const { component, handleComponentClick } = props;
     const rawSrc = component?.src || component?.url;
-    const isStoragePath = rawSrc && typeof rawSrc === 'string' && !rawSrc.startsWith('http') && !rawSrc.startsWith('/');
+    const isStoragePath = rawSrc && typeof rawSrc === 'string' && !rawSrc.startsWith('data:') && !rawSrc.startsWith('http') && !rawSrc.startsWith('/');
     const resolvedSrc = isStoragePath ? (Helper.storageUrl(rawSrc) || PLACEHOLDER) : (rawSrc || PLACEHOLDER);
     const [imgSrc, setImgSrc] = useState(resolvedSrc);
     useEffect(() => { setImgSrc(resolvedSrc); }, [resolvedSrc]);

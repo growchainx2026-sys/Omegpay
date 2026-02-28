@@ -1,9 +1,22 @@
+import { useState, useEffect } from "react"
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react"
 import { LucideStar } from "lucide-react"
 import type { DepoimentoComponentProps } from "../../types/components"
+import { Helper } from "@/helpers/helpers"
+
+const PHOTO_PLACEHOLDER = '/placeholder.svg';
+
+function getPhotoSrc(photo: string | undefined | null): string {
+    if (!photo) return PHOTO_PLACEHOLDER;
+    if (photo.startsWith('data:') || photo.startsWith('http') || photo.startsWith('/')) return photo;
+    return Helper.storageUrl(photo) || PHOTO_PLACEHOLDER;
+}
 
 export const DepoimentoComponent = ({ component, handleComponentClick }: { component: DepoimentoComponentProps, handleComponentClick: any }) => {
-   
+    const photoSrc = getPhotoSrc(component?.photo);
+    const [imgSrc, setImgSrc] = useState(photoSrc);
+    useEffect(() => { setImgSrc(photoSrc); }, [photoSrc]);
+    const onError = () => setImgSrc(PHOTO_PLACEHOLDER);
     return (
         <Box
             key={component?.id}
@@ -18,7 +31,7 @@ export const DepoimentoComponent = ({ component, handleComponentClick }: { compo
 
                 {component?.modoHorizontal ? (
                     <>
-                        <Box as="img" src={component?.photo || '/placeholder.svg'} alt="Foto" boxSize="60px" borderRadius="full" />
+                        <Box as="img" src={imgSrc} onError={onError} alt="Foto" boxSize="60px" borderRadius="full" />
                         <VStack spacing={1} align={'flex-start'}>
                             <Text fontWeight="bold" color={component?.corTexto}>{component?.depoimento}</Text>
                             <HStack>
@@ -32,7 +45,7 @@ export const DepoimentoComponent = ({ component, handleComponentClick }: { compo
 
                 ) : (
                     <VStack spacing={1} align={'center'}>
-                        <Box as="img" src={component?.photo || '/placeholder.svg'} alt="Foto" boxSize="60px" borderRadius="full" />
+                        <Box as="img" src={imgSrc} onError={onError} alt="Foto" boxSize="60px" borderRadius="full" />
                         <Text fontWeight="bold" color={component?.corTexto}>{component?.depoimento}</Text>
                         <HStack>
                             {Array.from({ length: component?.estrelas }).map((_, index) => (

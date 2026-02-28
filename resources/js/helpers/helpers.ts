@@ -102,12 +102,20 @@ type Status = "waiting_payment" | "paid" | "refunded";
 
   /**
    * Monta URL para arquivos em storage. Evita /storage//path e /storage/undefined.
-   * @param path Caminho relativo (com ou sem barra no início)
+   * Preserva data: URLs e URLs absolutas (http/https). Retorna undefined para box_default inexistente.
+   * @param path Caminho relativo (com ou sem barra no início), data URL ou URL absoluta
    * @returns URL completa ou undefined se path inválido
    */
   const storageUrl = (path: string | undefined | null): string | undefined => {
     if (path == null || path === "" || String(path) === "undefined") return undefined;
-    const trimmed = String(path).replace(/^\/+/, "");
+    const s = String(path);
+    // Preserva data: URLs e URLs absolutas (não passar por /storage/)
+    if (s.startsWith("data:") || s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/")) {
+      return s;
+    }
+    // box_default.png/svg pode não existir no storage — evita 404
+    if (s.includes("box_default")) return undefined;
+    const trimmed = s.replace(/^\/+/, "");
     return trimmed ? `/storage/${trimmed}` : undefined;
   };
 
