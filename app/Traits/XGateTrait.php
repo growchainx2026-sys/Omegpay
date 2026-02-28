@@ -174,8 +174,15 @@ trait XGateTrait
             $taxa_cash_in += $taxafixa;
 
             $idTransaction = $responseData['data']['id'] ?? $responseData['id'] ?? Str::uuid()->toString();
-            $qrcode = $responseData['data']['code'] ?? $responseData['code'] ?? $idTransaction;
-            $qrImage = $responseData['data']['qrCode'] ?? $responseData['qrCode'] ?? '';
+            $dataResp = $responseData['data'] ?? $responseData;
+            $qrcode = $dataResp['code'] ?? $dataResp['pix']['copyPaste'] ?? $dataResp['pix']['payload'] ?? $dataResp['brcode'] ?? $dataResp['emv'] ?? $dataResp['payload'] ?? $responseData['code'] ?? $idTransaction;
+            $qrImage = $dataResp['qrCode'] ?? $dataResp['qr_code_base64'] ?? $dataResp['qrcode'] ?? $dataResp['pix']['qrCode'] ?? $dataResp['pix']['encodedImage'] ?? $dataResp['pix']['qrcode'] ?? $responseData['qrCode'] ?? '';
+
+            if (empty($qrImage) && !empty($qrcode)) {
+                $qrImage = 'https://quickchart.io/qr?text=' . urlencode($qrcode) . '&size=300';
+            } elseif (!empty($qrImage) && !str_starts_with((string) $qrImage, 'data:') && !str_starts_with((string) $qrImage, 'http')) {
+                $qrImage = 'data:image/png;base64,' . $qrImage;
+            }
 
             $ip = $request->header('X-Forwarded-For') ?: ($request->header('CF-Connecting-IP') ?: $request->ip());
 
